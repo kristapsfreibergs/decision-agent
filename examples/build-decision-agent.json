@@ -1,0 +1,21 @@
+{
+  "task_id": "build-decision-agent-v0",
+  "title": "Build Decision Agent bootstrap harness",
+  "description": "Create a small, auditable, model-agnostic bootstrap harness that can coordinate bounded build agents through executable worker contracts.",
+  "requested_by": "kuznecov",
+  "constraints": {
+    "style": "clear modular architecture",
+    "runtime": "Node.js >=20",
+    "no_provider_lock_in": true,
+    "first_version": "CLI only",
+    "writes_must_be_audited": true
+  },
+  "desired_outputs": [
+    "ARCHITECTURE.md",
+    "architecture registry",
+    "decision router",
+    "worker contract validator",
+    "audit log",
+    "example run"
+  ]
+}

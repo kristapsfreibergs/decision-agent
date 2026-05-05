@@ -1,0 +1,19 @@
+{
+  "name": "decision-agent",
+  "version": "0.1.0",
+  "description": "Bootstrap harness for dynamic, auditable decision architectures.",
+  "private": true,
+  "bin": {
+    "decision-agent": "backend/src/decision_agent/cli.py"
+  },
+  "scripts": {
+    "start": "PYTHONPATH=backend/src python3 -m decision_agent.cli",
+    "ui": "PYTHONPATH=backend/src python3 -m decision_agent.server",
+    "run:example": "PYTHONPATH=backend/src python3 -m decision_agent.cli run examples/build-decision-agent.json",
+    "test": "PYTHONPATH=backend/src python3 -m unittest discover backend/tests"
+  },
+  "engines": {
+    "node": ">=20",
+    "python": ">=3.11"
+  }
+}

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture Is Use-Case-Dependent</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; padding: 20px 12px; font-family: "Segoe UI","Helvetica Neue",Arial,sans-serif; color: #1b1f24; }
+  .wrap { max-width: 1220px; margin: 0 auto; }
+  svg { display: block; width: 100%; height: auto; }
+  .caption { max-width: 1180px; margin: 11px auto 0; font-size: 12px; line-height: 1.55; color: #38424d; text-align: center; }
+  .caption b { color: #17202a; }
+  @media print { body { padding: 0; } .wrap { max-width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<svg viewBox="0 0 1200 1082" xmlns="http://www.w3.org/2000/svg">
+<title>Architecture Is Use-Case-Dependent: Two Concrete Pipeline Configurations</title>
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#34495e" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#1e8449" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#1a5276" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#6c3483" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<rect x="0" y="0" width="1200" height="790" fill="#ffffff"/>
+
+<!-- ===== MAIN TITLE ===== -->
+<text x="600" y="24" text-anchor="middle" font-family="Segoe UI,Arial" font-size="18" font-weight="700" fill="#17202a">Architecture Is Use-Case-Dependent: Two Concrete Pipeline Configurations</text>
+<text x="600" y="42" text-anchor="middle" font-family="Segoe UI,Arial" font-size="11" fill="#566573">Same LLM infrastructure — fundamentally different component selection and execution topology</text>
+
+<!-- ===== DIVIDER ===== -->
+<line x1="604" y1="52" x2="604" y2="698" stroke="#d5dbdb" stroke-width="1.2"/>
+<rect x="577" y="410" width="54" height="22" rx="11" fill="#eaecee" stroke="#bdc3c7"/>
+<text x="604" y="425" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#566573">vs</text>
+
+<!-- ====================== LEFT PIPELINE: AI SCIENTIST ====================== -->
+
+<!-- Header -->
+<rect x="18" y="52" width="578" height="62" rx="8" fill="#1a5276" stroke="#154360"/>
+<text x="307" y="76" text-anchor="middle" font-family="Segoe UI,Arial" font-size="14" font-weight="700" fill="#ffffff">Automated Research Review</text>
+<text x="307" y="93" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" fill="#aed6f1">AI Scientist pattern (Sakana AI, 2024) · open-ended exploratory loop · autonomous</text>
+<!-- Badges -->
+<rect x="88"  y="102" width="84" height="16" rx="8" fill="#27ae60" stroke="none"/>
+<text x="130" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">Exploratory loop</text>
+<rect x="182" y="102" width="78" height="16" rx="8" fill="#e74c3c" stroke="none"/>
+<text x="221" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">Code execution</text>
+<rect x="270" y="102" width="62" height="16" rx="8" fill="#d4ac0d" stroke="none"/>
+<text x="301" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">Autonomous</text>
+<rect x="342" y="102" width="80" height="16" rx="8" fill="#8e44ad" stroke="none"/>
+<text x="382" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">HITL optional</text>
+
+<!-- Step helper: left pipeline steps at x=18, width=540 -->
+<!-- step circle cx=42, title x=68 -->
+<!-- y values: s1=128 s2=184 s3=240 s4=296 s5=352 s6=408 s7=464 s8=520 s9=576 -->
+<!-- step height=48, gap=8 → pitch=56 -->
+
+<!-- Step 1 -->
+<rect x="18"  y="128" width="540" height="48" rx="7" fill="#eafaf1" stroke="#58d68d" stroke-width="1"/>
+<circle cx="42" cy="152" r="15" fill="#27ae60"/>
+<text x="42" y="157" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">1</text>
+<text x="68" y="146" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Research goal / prompt</text>
+<text x="68" y="162" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Goal manager · system prompt · context budget · intent classifier</text>
+
+<!-- Arrow 1→2 -->
+<path d="M307 176 L307 184" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 2 -->
+<rect x="18"  y="184" width="540" height="48" rx="7" fill="#eafaf1" stroke="#58d68d" stroke-width="1"/>
+<circle cx="42" cy="208" r="15" fill="#27ae60"/>
+<text x="42" y="213" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">2</text>
+<text x="68" y="202" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Literature search</text>
+<text x="68" y="218" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Web search · RAG (arXiv / Semantic Scholar) · vector index · freshness filter</text>
+
+<!-- Arrow 2→3 -->
+<path d="M307 232 L307 240" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 3 -->
+<rect x="18"  y="240" width="540" height="48" rx="7" fill="#eafaf1" stroke="#58d68d" stroke-width="1"/>
+<circle cx="42" cy="264" r="15" fill="#27ae60"/>
+<text x="42" y="269" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">3</text>
+<text x="68" y="258" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Idea generation &amp; novelty check</text>
+<text x="68" y="274" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · working memory · deduplication against retrieved corpus</text>
+
+<!-- Arrow 3→4 -->
+<path d="M307 288 L307 296" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 4 (loop target) -->
+<rect x="18"  y="296" width="540" height="48" rx="7" fill="#eafaf1" stroke="#58d68d" stroke-width="1"/>
+<circle cx="42" cy="320" r="15" fill="#27ae60"/>
+<text x="42" y="325" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">4</text>
+<text x="68" y="314" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Experiment design + code generation</text>
+<text x="68" y="330" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Planner · LLM→code · structured output (runnable script)</text>
+
+<!-- Arrow 4→5 -->
+<path d="M307 344 L307 352" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 5 -->
+<rect x="18"  y="352" width="540" height="48" rx="7" fill="#fef9e7" stroke="#d4ac0d" stroke-width="1.5"/>
+<circle cx="42" cy="376" r="15" fill="#d4ac0d"/>
+<text x="42" y="381" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">5</text>
+<text x="68" y="370" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Sandboxed execution</text>
+<text x="68" y="386" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Code sandbox · tool runner · timeout / resource limits · stderr capture</text>
+
+<!-- Arrow 5→6 -->
+<path d="M307 400 L307 408" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 6 -->
+<rect x="18"  y="408" width="540" height="48" rx="7" fill="#eafaf1" stroke="#58d68d" stroke-width="1"/>
+<circle cx="42" cy="432" r="15" fill="#27ae60"/>
+<text x="42" y="437" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">6</text>
+<text x="68" y="426" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Result interpretation</text>
+<text x="68" y="442" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · working memory · data parsing · statistical check</text>
+
+<!-- Arrow 6→7 -->
+<path d="M307 456 L307 464" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 7 (PRM / loop source) -->
+<rect x="18"  y="464" width="540" height="48" rx="7" fill="#d5f5e3" stroke="#1e8449" stroke-width="2"/>
+<circle cx="42" cy="488" r="15" fill="#1e8449"/>
+<text x="42" y="493" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">7</text>
+<text x="68" y="482" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">PRM / convergence check</text>
+<text x="68" y="498" font-family="Segoe UI,Arial" font-size="9" fill="#1a5e26">Process reward model · step scoring · early-stop or loop back to step 4</text>
+
+<!-- Loop arrow: step 7 bottom-right → curve right → up → step 4 top-right -->
+<path d="M558 512 C585 512 585 296 558 296" stroke="#c0392b" stroke-width="1.6" fill="none" stroke-dasharray="5 3" marker-end="url(#arr-red)"/>
+<text x="589" y="408" text-anchor="start" font-family="Segoe UI,Arial" font-size="8.5" fill="#c0392b" transform="rotate(90,589,408)">not converged — iterate</text>
+
+<!-- Arrow 7→8 (converged) -->
+<path d="M307 512 L307 520" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+<text x="315" y="518" font-family="Segoe UI,Arial" font-size="8" fill="#1e8449">converged</text>
+
+<!-- Step 8 -->
+<rect x="18"  y="520" width="540" height="48" rx="7" fill="#eafaf1" stroke="#58d68d" stroke-width="1"/>
+<circle cx="42" cy="544" r="15" fill="#27ae60"/>
+<text x="42" y="549" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">8</text>
+<text x="68" y="538" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Write-up / review draft</text>
+<text x="68" y="554" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · structured output · citation grounding · LaTeX / Markdown</text>
+
+<!-- Arrow 8→9 -->
+<path d="M307 568 L307 576" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+<!-- Step 9 -->
+<rect x="18"  y="576" width="540" height="48" rx="7" fill="#f8f9fa" stroke="#aab7b8" stroke-width="1" stroke-dasharray="6 3"/>
+<circle cx="42" cy="600" r="15" fill="#aab7b8"/>
+<text x="42" y="605" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">9</text>
+<text x="68" y="594" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#5d6d7e">Human review (optional)</text>
+<text x="68" y="610" font-family="Segoe UI,Arial" font-size="9" fill="#7f8c8d">HITL optional · async notification · accept / reject / revise</text>
+
+<!-- NOT USED box (left) -->
+<rect x="18" y="636" width="578" height="52" rx="7" fill="#fdedec" stroke="#c0392b" stroke-width="1"/>
+<text x="30" y="654" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#922b21">Not needed in this configuration:</text>
+<text x="30" y="672" font-family="Segoe UI,Arial" font-size="9.5" fill="#c0392b">✗ Mandatory HITL gates    ✗ Policy / criteria engine    ✗ Option elimination logic    ✗ Bounded input schema</text>
+
+<!-- ====================== RIGHT PIPELINE: ENTERPRISE DECISION ====================== -->
+
+<!-- Header -->
+<rect x="622" y="52" width="578" height="62" rx="8" fill="#154360" stroke="#0e2f44"/>
+<text x="911" y="76" text-anchor="middle" font-family="Segoe UI,Arial" font-size="14" font-weight="700" fill="#ffffff">Enterprise Decision Support</text>
+<text x="911" y="93" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" fill="#aed6f1">Structured deliberation · eliminate weakest options · criteria-driven · human-gated</text>
+<!-- Badges -->
+<rect x="690" y="102" width="84" height="16" rx="8" fill="#1a5276" stroke="none"/>
+<text x="732" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">Bounded funnel</text>
+<rect x="784" y="102" width="80" height="16" rx="8" fill="#884ea0" stroke="none"/>
+<text x="824" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">Human-gated</text>
+<rect x="874" y="102" width="88" height="16" rx="8" fill="#117a65" stroke="none"/>
+<text x="918" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">Criteria-driven</text>
+<rect x="972" y="102" width="76" height="16" rx="8" fill="#b9770e" stroke="none"/>
+<text x="1010" y="114" text-anchor="middle" font-family="Segoe UI,Arial" font-size="8.5" font-weight="700" fill="white">No web search</text>
+
+<!-- right pipeline: x=622, width=540, center=892 -->
+<!-- step circle cx=646, title x=672 -->
+
+<!-- Step 1 -->
+<rect x="622" y="128" width="540" height="48" rx="7" fill="#eaf2f8" stroke="#5dade2" stroke-width="1"/>
+<circle cx="646" cy="152" r="15" fill="#2471a3"/>
+<text x="646" y="157" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">1</text>
+<text x="672" y="146" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">N candidate options intake</text>
+<text x="672" y="162" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Structured input · schema validation · working memory (hold all N options)</text>
+
+<!-- Arrow 1→2 -->
+<path d="M892 176 L892 184" stroke="#1a5276" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+<!-- Step 2 -->
+<rect x="622" y="184" width="540" height="48" rx="7" fill="#eaf2f8" stroke="#5dade2" stroke-width="1"/>
+<circle cx="646" cy="208" r="15" fill="#2471a3"/>
+<text x="646" y="213" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">2</text>
+<text x="672" y="202" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Criteria &amp; policy rule loading</text>
+<text x="672" y="218" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Policy engine · RAG (internal docs only) · explicit scoring rubric</text>
+
+<!-- Arrow 2→3 -->
+<path d="M892 232 L892 240" stroke="#1a5276" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+<!-- Step 3 -->
+<rect x="622" y="240" width="540" height="48" rx="7" fill="#eaf2f8" stroke="#5dade2" stroke-width="1"/>
+<circle cx="646" cy="264" r="15" fill="#2471a3"/>
+<text x="646" y="269" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">3</text>
+<text x="672" y="258" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Score each option against criteria</text>
+<text x="672" y="274" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · structured output · per-option JSON score card</text>
+
+<!-- Arrow 3→4 -->
+<path d="M892 288 L892 296" stroke="#1a5276" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+<!-- Step 4 (elimination — funnel) -->
+<rect x="622" y="296" width="540" height="48" rx="7" fill="#d6eaf8" stroke="#1a5276" stroke-width="2"/>
+<circle cx="646" cy="320" r="15" fill="#1a5276"/>
+<text x="646" y="325" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">4</text>
+<text x="672" y="314" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Eliminate weakest option(s)</text>
+<text x="672" y="330" font-family="Segoe UI,Arial" font-size="9" fill="#1a5276">Policy engine · deterministic elimination logic · N → N-k options remaining</text>
+<!-- Funnel indicator -->
+<text x="1148" y="316" text-anchor="end" font-family="Segoe UI,Arial" font-size="22" fill="#2471a3" opacity="0.35">▼</text>
+<text x="1148" y="334" text-anchor="end" font-family="Segoe UI,Arial" font-size="8" fill="#2471a3">N→N-k</text>
+
+<!-- Arrow 4→5 -->
+<path d="M892 344 L892 352" stroke="#6c3483" stroke-width="2" marker-end="url(#arr-purple)"/>
+
+<!-- Step 5 HITL MANDATORY — highlighted -->
+<rect x="622" y="352" width="540" height="48" rx="7" fill="#f4ecf7" stroke="#6c3483" stroke-width="2.5"/>
+<circle cx="646" cy="376" r="15" fill="#6c3483"/>
+<text x="646" y="381" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">5</text>
+<text x="672" y="369" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">← Human checkpoint  </text>
+<text x="826" y="369" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#6c3483">[MANDATORY]</text>
+<text x="672" y="385" font-family="Segoe UI,Arial" font-size="9" fill="#6c3483">HITL approval gate · human reviews eliminated options · approve or override · audit log</text>
+
+<!-- Arrow 5→6 -->
+<path d="M892 400 L892 408" stroke="#1a5276" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+<!-- Step 6 -->
+<rect x="622" y="408" width="540" height="48" rx="7" fill="#eaf2f8" stroke="#5dade2" stroke-width="1"/>
+<circle cx="646" cy="432" r="15" fill="#2471a3"/>
+<text x="646" y="437" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">6</text>
+<text x="672" y="426" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Deep compare remaining options</text>
+<text x="672" y="442" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · working memory (all surviving options) · structured comparison matrix</text>
+
+<!-- Arrow 6→7 -->
+<path d="M892 456 L892 464" stroke="#1a5276" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+<!-- Step 7 -->
+<rect x="622" y="464" width="540" height="48" rx="7" fill="#eaf2f8" stroke="#5dade2" stroke-width="1"/>
+<circle cx="646" cy="488" r="15" fill="#2471a3"/>
+<text x="646" y="493" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">7</text>
+<text x="672" y="482" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Recommendation synthesis</text>
+<text x="672" y="498" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · planner · rationale generation · confidence and risk scoring</text>
+
+<!-- Arrow 7→8 -->
+<path d="M892 512 L892 520" stroke="#1a5276" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+<!-- Step 8 -->
+<rect x="622" y="520" width="540" height="48" rx="7" fill="#eaf2f8" stroke="#5dade2" stroke-width="1"/>
+<circle cx="646" cy="544" r="15" fill="#2471a3"/>
+<text x="646" y="549" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">8</text>
+<text x="672" y="538" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Structured report output</text>
+<text x="672" y="554" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">JSON schema · structured output · version stamp · decision provenance</text>
+
+<!-- Arrow 8→9 -->
+<path d="M892 568 L892 576" stroke="#6c3483" stroke-width="2" marker-end="url(#arr-purple)"/>
+
+<!-- Step 9 HITL MANDATORY -->
+<rect x="622" y="576" width="540" height="48" rx="7" fill="#f4ecf7" stroke="#6c3483" stroke-width="2.5"/>
+<circle cx="646" cy="600" r="15" fill="#6c3483"/>
+<text x="646" y="605" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="white">9</text>
+<text x="672" y="594" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#17202a">Final human decision + sign-off</text>
+<text x="672" y="610" font-family="Segoe UI,Arial" font-size="9" fill="#6c3483">HITL required · immutable audit log · regulatory record · execution release</text>
+
+<!-- NOT USED box (right) -->
+<rect x="622" y="636" width="578" height="52" rx="7" fill="#fdedec" stroke="#c0392b" stroke-width="1"/>
+<text x="634" y="654" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#922b21">Not needed in this configuration:</text>
+<text x="634" y="672" font-family="Segoe UI,Arial" font-size="9.5" fill="#c0392b">✗ Web / live search    ✗ Code sandbox    ✗ Multi-agent swarm    ✗ PRM convergence loop    ✗ Autonomous loop</text>
+
+<!-- ===== BOTTOM KEY INSIGHT ===== -->
+<rect x="18" y="698" width="1182" height="54" rx="8" fill="#17202a" stroke="#0b1116"/>
+<text x="609" y="720" text-anchor="middle" font-family="Segoe UI,Arial" font-size="11" font-weight="700" fill="#ffffff">Topology determines architecture: open-ended research requires exploratory loops and code execution; bounded deliberation requires policy-driven elimination and mandatory human gates.</text>
+<text x="609" y="740" text-anchor="middle" font-family="Segoe UI,Arial" font-size="10" fill="#aab7b8">Shared: LLM calls · working memory · structured output · audit log · request gateway     |     Diverge: search, sandbox, PRM, HITL role, agent topology</text>
+
+<!-- ===== SECTION: THREE ADDITIONAL PROFILES ===== -->
+<line x1="16" y1="762" x2="1184" y2="762" stroke="#d5dbdb" stroke-width="1"/>
+<text x="600" y="778" text-anchor="middle" font-family="Segoe UI,Arial" font-size="12" font-weight="700" fill="#2c3e50">Three Additional Configuration Profiles</text>
+
+<!-- ======= CARD 1: SOFTWARE ENGINEERING AGENT (Amber) ======= -->
+<!-- card outer -->
+<rect x="16" y="788" width="374" height="280" rx="8" fill="#fffdf5" stroke="#d4ac0d" stroke-width="1.2"/>
+<!-- card header fill (rounded top + square bottom) -->
+<rect x="16" y="788" width="374" height="50" rx="8" fill="#b9770e"/>
+<rect x="16" y="808" width="374" height="30" fill="#b9770e"/>
+<text x="203" y="810" text-anchor="middle" font-family="Segoe UI,Arial" font-size="12" font-weight="700" fill="white">Software Engineering Agent</text>
+<text x="203" y="826" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#fde8b7">Devin / SWE-bench pattern · implement, test, commit</text>
+
+<!-- s1=843 -->
+<rect x="24" y="843" width="358" height="28" rx="5" fill="#fef9e7" stroke="#d4ac0d" stroke-width="0.8"/>
+<circle cx="36" cy="857" r="8" fill="#b9770e"/><text x="36" y="861" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">1</text>
+<text x="50" y="854" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Issue / task specification</text>
+<text x="50" y="866" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Goal manager · context budget · task schema</text>
+<text x="203" y="875" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#b9770e">▾</text>
+
+<!-- s2=879 -->
+<rect x="24" y="879" width="358" height="28" rx="5" fill="#fef9e7" stroke="#d4ac0d" stroke-width="0.8"/>
+<circle cx="36" cy="893" r="8" fill="#b9770e"/><text x="36" y="897" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">2</text>
+<text x="50" y="890" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Codebase exploration</text>
+<text x="50" y="902" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">RAG (code index) · file tree · symbol lookup</text>
+<text x="203" y="911" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#b9770e">▾</text>
+
+<!-- s3=915 -->
+<rect x="24" y="915" width="358" height="28" rx="5" fill="#fef9e7" stroke="#d4ac0d" stroke-width="0.8"/>
+<circle cx="36" cy="929" r="8" fill="#b9770e"/><text x="36" y="933" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">3</text>
+<text x="50" y="926" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Implementation planning</text>
+<text x="50" y="938" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Planner · multi-file dependency graph · change scope</text>
+<text x="203" y="947" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#b9770e">▾</text>
+
+<!-- s4=951 -->
+<rect x="24" y="951" width="358" height="28" rx="5" fill="#fef9e7" stroke="#d4ac0d" stroke-width="0.8"/>
+<circle cx="36" cy="965" r="8" fill="#b9770e"/><text x="36" y="969" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">4</text>
+<text x="50" y="962" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Code generation &amp; file editing</text>
+<text x="50" y="974" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM → code · tool (file write / patch) · diff output</text>
+<text x="203" y="983" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#b9770e">▾</text>
+
+<!-- s5=987 PRM debug loop (highlighted) -->
+<rect x="24" y="987" width="358" height="28" rx="5" fill="#fcf3cf" stroke="#b9770e" stroke-width="2"/>
+<circle cx="36" cy="1001" r="8" fill="#7d6608"/><text x="36" y="1005" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">5</text>
+<text x="50" y="998" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Test execution &amp; debug loop ↺</text>
+<text x="50" y="1010" font-family="Segoe UI,Arial" font-size="9" fill="#7d6608">Code sandbox · PRM (test pass rate) · retry → step 4</text>
+<text x="203" y="1019" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#b9770e">▾</text>
+
+<!-- s6=1023 HITL optional (dashed) -->
+<rect x="24" y="1023" width="358" height="28" rx="5" fill="#f8f9fa" stroke="#aab7b8" stroke-width="0.8" stroke-dasharray="5 3"/>
+<circle cx="36" cy="1037" r="8" fill="#aab7b8"/><text x="36" y="1041" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">6</text>
+<text x="50" y="1034" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#5d6d7e">Human code review [optional]</text>
+<text x="50" y="1046" font-family="Segoe UI,Arial" font-size="9" fill="#7f8c8d">HITL · PR / git diff · merge gate · CI/CD trigger</text>
+
+<!-- not-used -->
+<rect x="16" y="1057" width="374" height="11" fill="#fffdf5" stroke="none"/>
+<rect x="16" y="1052" width="374" height="26" rx="5" fill="#fdedec" stroke="#e74c3c" stroke-width="0.8"/>
+<text x="26" y="1069" font-family="Segoe UI,Arial" font-size="8.5" fill="#922b21">✗ Web / live search   ✗ Policy criteria engine   ✗ Option elimination</text>
+
+<!-- ======= CARD 2: LEGAL / COMPLIANCE REVIEW (Purple) ======= -->
+<rect x="406" y="788" width="374" height="280" rx="8" fill="#fbf5ff" stroke="#884ea0" stroke-width="1.2"/>
+<rect x="406" y="788" width="374" height="50" rx="8" fill="#6c3483"/>
+<rect x="406" y="808" width="374" height="30" fill="#6c3483"/>
+<text x="593" y="810" text-anchor="middle" font-family="Segoe UI,Arial" font-size="12" font-weight="700" fill="white">Legal / Compliance Review</text>
+<text x="593" y="826" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#d7bde2">Document analysis · regulation-driven · mandatory sign-off</text>
+
+<!-- s1=843 -->
+<rect x="414" y="843" width="358" height="28" rx="5" fill="#f4ecf7" stroke="#884ea0" stroke-width="0.8"/>
+<circle cx="426" cy="857" r="8" fill="#6c3483"/><text x="426" y="861" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">1</text>
+<text x="440" y="854" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Document corpus intake</text>
+<text x="440" y="866" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Structured input · RAG chunking · schema validation</text>
+<text x="593" y="875" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#884ea0">▾</text>
+
+<!-- s2=879 -->
+<rect x="414" y="879" width="358" height="28" rx="5" fill="#f4ecf7" stroke="#884ea0" stroke-width="0.8"/>
+<circle cx="426" cy="893" r="8" fill="#6c3483"/><text x="426" y="897" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">2</text>
+<text x="440" y="890" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Clause &amp; obligation extraction</text>
+<text x="440" y="902" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM · structured output · named entity recognition</text>
+<text x="593" y="911" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#884ea0">▾</text>
+
+<!-- s3=915 -->
+<rect x="414" y="915" width="358" height="28" rx="5" fill="#f4ecf7" stroke="#884ea0" stroke-width="0.8"/>
+<circle cx="426" cy="929" r="8" fill="#6c3483"/><text x="426" y="933" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">3</text>
+<text x="440" y="926" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Regulatory criteria loading</text>
+<text x="440" y="938" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Policy engine · rule parser · version pin</text>
+<text x="593" y="947" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#884ea0">▾</text>
+
+<!-- s4=951 -->
+<rect x="414" y="951" width="358" height="28" rx="5" fill="#f4ecf7" stroke="#884ea0" stroke-width="0.8"/>
+<circle cx="426" cy="965" r="8" fill="#6c3483"/><text x="426" y="969" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">4</text>
+<text x="440" y="962" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Compliance gap analysis</text>
+<text x="440" y="974" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · evidence linking · structured comparison</text>
+<text x="593" y="983" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#884ea0">▾</text>
+
+<!-- s5=987 -->
+<rect x="414" y="987" width="358" height="28" rx="5" fill="#f4ecf7" stroke="#884ea0" stroke-width="0.8"/>
+<circle cx="426" cy="1001" r="8" fill="#6c3483"/><text x="426" y="1005" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">5</text>
+<text x="440" y="998" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Citation &amp; provenance mapping</text>
+<text x="440" y="1010" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">RAG · citation tracker · lineage log · immutable refs</text>
+<text x="593" y="1019" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#6c3483">▾</text>
+
+<!-- s6=1023 HITL MANDATORY (highlighted) -->
+<rect x="414" y="1023" width="358" height="28" rx="5" fill="#e8daef" stroke="#6c3483" stroke-width="2.5"/>
+<circle cx="426" cy="1037" r="8" fill="#4a235a"/><text x="426" y="1041" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">6</text>
+<text x="440" y="1034" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Legal reviewer sign-off </text>
+<text x="566" y="1034" font-family="Segoe UI,Arial" font-size="9" font-weight="700" fill="#6c3483">[MANDATORY]</text>
+<text x="440" y="1046" font-family="Segoe UI,Arial" font-size="9" fill="#6c3483">HITL required · audit log · compliance report output</text>
+
+<!-- not-used -->
+<rect x="406" y="1057" width="374" height="11" fill="#fbf5ff" stroke="none"/>
+<rect x="406" y="1052" width="374" height="26" rx="5" fill="#fdedec" stroke="#e74c3c" stroke-width="0.8"/>
+<text x="416" y="1069" font-family="Segoe UI,Arial" font-size="8.5" fill="#922b21">✗ Web search   ✗ Code sandbox   ✗ Autonomous loop   ✗ Multi-agent</text>
+
+<!-- ======= CARD 3: REAL-TIME CUSTOMER SUPPORT (Teal) ======= -->
+<rect x="800" y="788" width="384" height="280" rx="8" fill="#f0fdf9" stroke="#17a589" stroke-width="1.2"/>
+<rect x="800" y="788" width="384" height="50" rx="8" fill="#117a65"/>
+<rect x="800" y="808" width="384" height="30" fill="#117a65"/>
+<text x="992" y="810" text-anchor="middle" font-family="Segoe UI,Arial" font-size="12" font-weight="700" fill="white">Real-time Customer Support</text>
+<text x="992" y="826" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#a3e4d7">Single-turn · latency-sensitive · escalate on demand</text>
+
+<!-- s1=843 -->
+<rect x="808" y="843" width="368" height="28" rx="5" fill="#e8f8f5" stroke="#17a589" stroke-width="0.8"/>
+<circle cx="820" cy="857" r="8" fill="#117a65"/><text x="820" y="861" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">1</text>
+<text x="834" y="854" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Customer message &amp; session start</text>
+<text x="834" y="866" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">AuthN · session memory · intent classifier · rate limit</text>
+<text x="992" y="875" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#17a589">▾</text>
+
+<!-- s2=879 -->
+<rect x="808" y="879" width="368" height="28" rx="5" fill="#e8f8f5" stroke="#17a589" stroke-width="0.8"/>
+<circle cx="820" cy="893" r="8" fill="#117a65"/><text x="820" y="897" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">2</text>
+<text x="834" y="890" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">KB / product doc lookup</text>
+<text x="834" y="902" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">RAG (product KB) · single retrieval · freshness filter</text>
+<text x="992" y="911" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#17a589">▾</text>
+
+<!-- s3=915 -->
+<rect x="808" y="915" width="368" height="28" rx="5" fill="#e8f8f5" stroke="#17a589" stroke-width="0.8"/>
+<circle cx="820" cy="929" r="8" fill="#117a65"/><text x="820" y="933" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">3</text>
+<text x="834" y="926" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Response generation</text>
+<text x="834" y="938" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">LLM call · working memory · tone / safety policy</text>
+<text x="992" y="947" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#17a589">▾</text>
+
+<!-- s4=951 -->
+<rect x="808" y="951" width="368" height="28" rx="5" fill="#e8f8f5" stroke="#17a589" stroke-width="0.8"/>
+<circle cx="820" cy="965" r="8" fill="#117a65"/><text x="820" y="969" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">4</text>
+<text x="834" y="962" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Confidence &amp; risk check</text>
+<text x="834" y="974" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Risk pre-check · escalation threshold evaluation</text>
+<text x="992" y="983" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#17a589">▾</text>
+
+<!-- s5=987 conditional escalation (orange highlight) -->
+<rect x="808" y="987" width="368" height="28" rx="5" fill="#fdebd0" stroke="#e59866" stroke-width="2"/>
+<circle cx="820" cy="1001" r="8" fill="#b9770e"/><text x="820" y="1005" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">5</text>
+<text x="834" y="998" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Escalate if threshold breached</text>
+<text x="834" y="1010" font-family="Segoe UI,Arial" font-size="9" fill="#b9770e">HITL trigger · async agent handoff · ticket creation</text>
+<text x="992" y="1019" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9" fill="#17a589">▾</text>
+
+<!-- s6=1023 -->
+<rect x="808" y="1023" width="368" height="28" rx="5" fill="#e8f8f5" stroke="#17a589" stroke-width="0.8"/>
+<circle cx="820" cy="1037" r="8" fill="#117a65"/><text x="820" y="1041" text-anchor="middle" font-family="Segoe UI,Arial" font-size="7.5" font-weight="700" fill="white">6</text>
+<text x="834" y="1034" font-family="Segoe UI,Arial" font-size="10" font-weight="700" fill="#17202a">Response delivery (&lt;2 s)</text>
+<text x="834" y="1046" font-family="Segoe UI,Arial" font-size="9" fill="#5d6d7e">Streaming SSE · session log · CSAT capture</text>
+
+<!-- not-used -->
+<rect x="800" y="1057" width="384" height="11" fill="#f0fdf9" stroke="none"/>
+<rect x="800" y="1052" width="384" height="26" rx="5" fill="#fdedec" stroke="#e74c3c" stroke-width="0.8"/>
+<text x="810" y="1069" font-family="Segoe UI,Arial" font-size="8.5" fill="#922b21">✗ Code sandbox   ✗ Multi-agent   ✗ Planning / decomp.   ✗ PRM loop</text>
+
+</svg>
+<p class="caption">
+  <b>Figure 3.</b> Five concrete LLM agentic pipeline configurations across different task types. <b>Left</b>: automated research review following the AI Scientist pattern — open-ended, iterative, code-executing, with HITL as optional quality gate. <b>Right</b>: enterprise decision support — bounded elimination funnel, no web search or code execution, mandatory human approval at both the elimination checkpoint (step 5) and final sign-off (step 9). Purple HITL steps and the red loop arrow highlight the primary structural differences. Both pipelines share the same underlying LLM infrastructure but activate fundamentally different component subsets.
+</p>
+</div>
+</body>
+</html>
