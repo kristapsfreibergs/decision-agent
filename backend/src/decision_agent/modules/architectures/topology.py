@@ -7,7 +7,15 @@ def build_topology(goal_structure: dict[str, Any]) -> dict[str, Any]:
     shape = goal_structure["shape"]
     modifiers = set(goal_structure.get("modifiers", []))
 
-    if shape == "search":
+    if shape == "tree":
+        phases = [
+            _phase("plan", "plan_structure", "Plan the structure and divide into independent branches.", False),
+            _phase("branch", "execute_branches", "Execute independent branches in parallel.", True),
+            _phase("merge", "merge_outputs", "Merge branch outputs into a coherent whole.", False),
+        ]
+        completion = "done means all branches are merged into a unified output"
+        dependency_model = "branches run in parallel after planning; merge waits on all branches"
+    elif shape == "search":
         phases = [
             _phase("frame", "frame_search", "Frame the search space and constraints.", False),
             _phase("explore", "explore_candidates", "Explore candidate options and evidence.", True),

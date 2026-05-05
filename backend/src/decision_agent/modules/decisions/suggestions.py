@@ -9,7 +9,7 @@ from decision_agent.shared.providers.base import LLMProvider
 
 
 def suggest_task_setup(task: dict[str, Any], root: Path, provider: LLMProvider | None = None) -> dict[str, Any]:
-    goal_structure = classify_goal_structure(task)
+    goal_structure = classify_goal_structure(task, provider=provider)
     modifiers = goal_structure.get("modifiers", [])
 
     # If the task needs clarification, return only the questions — no topology yet.
@@ -40,7 +40,7 @@ def suggest_task_setup_with_answers(
         enriched_description = enriched_description + ("\n\n" if enriched_description else "") + "Clarifications:\n" + "\n".join(f"- {a}" for a in answers if a.strip())
     enriched_task = {**task, "description": enriched_description}
 
-    goal_structure = classify_goal_structure(enriched_task)
+    goal_structure = classify_goal_structure(enriched_task, provider=provider)
     return _build_full_suggestion(enriched_task, goal_structure, root, provider)
 
 

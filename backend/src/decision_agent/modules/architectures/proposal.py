@@ -7,9 +7,37 @@ from pathlib import Path
 from typing import Any
 
 from decision_agent.modules.architectures.decomposers.software import decompose_software_task
+from decision_agent.modules.architectures.domains.story import build_story_decomposition
 from decision_agent.modules.architectures.goal_structure import classify_goal_structure
 from decision_agent.modules.architectures.topology import build_topology
 from decision_agent.shared.providers.base import LLMProvider
+
+_KNOWN_DOMAINS = {"story"}
+
+_DOMAIN_DETECT_SYSTEM = (
+    "You are a task domain classifier. Given a task title and description, "
+    "decide if it belongs to one of these known domains: story. "
+    "A story domain task asks to write, create, draft, or generate a story, tale, narrative, fiction, or creative writing. "
+    "Respond with JSON only: {\"domain\": \"story\"} or {\"domain\": null}"
+)
+
+
+def _detect_domain(task: dict[str, Any], provider: LLMProvider | None) -> str | None:
+    if provider is None:
+        text = f"{task.get('title', '')} {task.get('description', '')}".lower()
+        if any(w in text for w in ("story", "tale", "narrative", "fiction", "novel", "fable", "write a")):
+            return "story"
+        return None
+    user = f"Task: {task.get('title', '')}\nDescription: {task.get('description', '') or 'none'}"
+    try:
+        raw = provider.complete(_DOMAIN_DETECT_SYSTEM, user, max_tokens=64)
+        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw.strip())
+        data = json.loads(raw)
+        domain = data.get("domain")
+        return domain if domain in _KNOWN_DOMAINS else None
+    except Exception:
+        return None
 
 PROVIDER_MARKERS = [
     "anthropic",
@@ -28,16 +56,34 @@ def build_mock_proposal(run: dict[str, Any], root: Path | None = None) -> dict[s
 
 
 def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvider | None = None) -> dict[str, Any]:
-    goal_structure = classify_goal_structure(run.get("task") or {})
-    topology = build_topology(goal_structure)
     task = run.get("task") or {}
+    domain = _detect_domain(task, provider)
 
-    if run["decision_type"] == "software_project_build_task":
-        decomposition = decompose_software_task(task, topology, root, goal_structure)
-    elif provider is not None:
-        decomposition = _llm_decomposition(task, topology, goal_structure, provider)
+    if domain == "story":
+        goal_structure = {"shape": "tree", "modifiers": [], "reasoning": "Story tasks use a parallel intake (brief + research) feeding a sequential draft → refine → style pipeline."}
+        topology = {
+            "shape": "tree",
+            "phases": [
+                {"id": "intake", "slot": "parallel_intake", "parallelizable": True,  "done_means": "Brief and research complete."},
+                {"id": "draft",  "slot": "write_draft",     "parallelizable": False, "done_means": "Complete story draft written."},
+                {"id": "refine", "slot": "proofread",        "parallelizable": False, "done_means": "Draft proofread and corrected."},
+                {"id": "style",  "slot": "apply_voice",      "parallelizable": False, "done_means": "Final story in human's voice written."},
+            ],
+            "dependency_model": "briefer + researcher parallel in intake; writer waits on both; proofreader and stylist sequential",
+            "completion_semantics": "done means final.md is produced",
+            "gates": [],
+            "topology_reasoning": "Story domain: parallel intake branches merge into sequential draft → refine → style.",
+        }
+        decomposition = build_story_decomposition(task, run["run_id"])
     else:
-        decomposition = _generic_decomposition(task, topology, goal_structure)
+        goal_structure = classify_goal_structure(task, provider=provider)
+        topology = build_topology(goal_structure)
+        if run["decision_type"] == "software_project_build_task":
+            decomposition = decompose_software_task(task, topology, root, goal_structure)
+        elif provider is not None:
+            decomposition = _llm_decomposition(task, topology, goal_structure, provider)
+        else:
+            decomposition = _generic_decomposition(task, topology, goal_structure)
 
     packages = decomposition["packages"]
     return {
@@ -370,6 +416,10 @@ def _llm_decomposition(
 
 
 _PHASE_GOALS: dict[str, str] = {
+    # tree
+    "plan": "Plan the structure and divide the task into independent parallel branches.",
+    "branch": "Execute this branch independently, producing a complete sub-artifact.",
+    "merge": "Merge all branch outputs into a single coherent final artifact.",
     # pipeline
     "scope": "Scope the task, clarify constraints, and define acceptance criteria.",
     "assemble": "Produce the requested artifact within the bounded scope.",
@@ -392,6 +442,9 @@ _PHASE_GOALS: dict[str, str] = {
 }
 
 _PHASE_OUTPUT_FIELDS: dict[str, list[str]] = {
+    "plan":        ["summary", "branches", "structure"],
+    "branch":      ["summary", "output", "files_changed"],
+    "merge":       ["summary", "output", "files_changed"],
     "scope":       ["summary", "constraints", "questions"],
     "assemble":    ["summary", "output", "files_changed"],
     "review":      ["summary", "issues", "verdict"],

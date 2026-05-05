@@ -1,39 +1,37 @@
 from __future__ import annotations
 
+import json
+import re
 from typing import Any
 
-SHAPES = {"pipeline", "search", "funnel", "debate", "checker"}
+SHAPES = {"pipeline", "tree", "search", "funnel", "debate", "checker"}
 
-DEBATE_KEYWORDS = {"debate", "argue", "pros and cons", "counter", "position"}
-SEARCH_KEYWORDS = {"research", "explore", "investigate", "discover", "compare options", "survey"}
-FUNNEL_KEYWORDS = {"choose", "select", "rank", "prioritize", "screen", "shortlist"}
-CHECKER_KEYWORDS = {"review", "check", "audit", "validate", "verify", "inspect", "compliance"}
 HIGH_RISK_KEYWORDS = {"auth", "security", "payment", "invoice", "medical", "legal", "production", "prescription"}
 AMBIGUOUS_KEYWORDS = {"something", "stuff", "improve", "fix it", "handle this"}
 
+_SHAPE_DESCRIPTIONS = """
+- pipeline: linear sequence of steps where each depends on the previous. Use for: writing a document, building a feature, drafting a contract, creating a report with clear sequential stages.
+- tree: parallel branches that are later merged. Use for: large documents with independent chapters/sections written simultaneously, multi-part research where topics are independent, any task where sub-tasks don't depend on each other.
+- search: explore a space then converge on a result. Use for: research tasks, finding the best option, investigating a topic, gathering evidence.
+- funnel: collect many candidates then narrow to one. Use for: hiring, selecting a vendor, choosing a technology, screening options.
+- debate: two opposing positions tested against each other. Use for: pros/cons analysis, strategic decisions with tradeoffs, policy evaluation.
+- checker: verify claims or artifacts against criteria. Use for: code review, compliance audit, fact-checking, QA.
+"""
 
-def classify_goal_structure(task: dict[str, Any]) -> dict[str, Any]:
+_SYSTEM = (
+    "You are a task shape classifier. Given a task, select the best execution shape from this list:\n"
+    + _SHAPE_DESCRIPTIONS
+    + "\nRespond with JSON only: {\"shape\": \"<shape>\", \"reasoning\": \"<one sentence>\", \"modifiers\": [\"needs_clarification\"?]}\n"
+    "Add needs_clarification to modifiers only if the task is genuinely underspecified (missing key details to proceed)."
+)
+
+
+def classify_goal_structure(task: dict[str, Any], provider: Any = None) -> dict[str, Any]:
     text = " ".join(
         str(value)
         for value in [task.get("title"), task.get("description"), *(task.get("desired_outputs") or [])]
         if value
     ).lower()
-
-    shape = "pipeline"
-    reasoning = "Task appears to request producing a bounded artifact through ordered execution."
-
-    if any(keyword in text for keyword in DEBATE_KEYWORDS):
-        shape = "debate"
-        reasoning = "Task language indicates adversarial comparison or position testing."
-    elif any(keyword in text for keyword in SEARCH_KEYWORDS):
-        shape = "search"
-        reasoning = "Task language indicates exploration with convergence rather than direct assembly."
-    elif any(keyword in text for keyword in FUNNEL_KEYWORDS):
-        shape = "funnel"
-        reasoning = "Task language indicates narrowing options toward a chosen result."
-    elif any(keyword in text for keyword in CHECKER_KEYWORDS):
-        shape = "checker"
-        reasoning = "Task language indicates evidence collection and verification."
 
     modifiers: list[str] = []
     if _is_ambiguous(task, text):
@@ -41,11 +39,52 @@ def classify_goal_structure(task: dict[str, Any]) -> dict[str, Any]:
     if any(keyword in text for keyword in HIGH_RISK_KEYWORDS):
         modifiers.extend(["high_risk", "human_gate_required"])
 
-    return {
-        "shape": shape,
-        "modifiers": sorted(set(modifiers)),
-        "reasoning": reasoning,
-    }
+    if provider is not None:
+        result = _llm_classify(task, provider)
+        if result:
+            # Merge modifiers — keep hard-coded high_risk/needs_clarification, add LLM suggestions
+            all_modifiers = sorted(set(modifiers + result.get("modifiers", [])))
+            return {
+                "shape": result["shape"],
+                "modifiers": all_modifiers,
+                "reasoning": result["reasoning"],
+            }
+
+    # Fallback: keyword heuristic
+    return _keyword_classify(text, modifiers)
+
+
+def _llm_classify(task: dict[str, Any], provider: Any) -> dict[str, Any] | None:
+    user = f"Task: {task.get('title', '')}\nDescription: {task.get('description', '') or 'none'}"
+    try:
+        raw = provider.complete(_SYSTEM, user, max_tokens=256)
+        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw.strip())
+        data = json.loads(raw)
+        shape = data.get("shape", "pipeline")
+        if shape not in SHAPES:
+            shape = "pipeline"
+        return {
+            "shape": shape,
+            "reasoning": data.get("reasoning", ""),
+            "modifiers": [m for m in data.get("modifiers", []) if isinstance(m, str)],
+        }
+    except Exception:
+        return None
+
+
+def _keyword_classify(text: str, modifiers: list[str]) -> dict[str, Any]:
+    if any(k in text for k in ("debate", "argue", "pros and cons", "counter", "position")):
+        return {"shape": "debate", "modifiers": modifiers, "reasoning": "Task language indicates adversarial comparison."}
+    if any(k in text for k in ("research", "explore", "investigate", "discover", "survey")):
+        return {"shape": "search", "modifiers": modifiers, "reasoning": "Task language indicates exploration with convergence."}
+    if any(k in text for k in ("choose", "select", "rank", "prioritize", "screen", "shortlist")):
+        return {"shape": "funnel", "modifiers": modifiers, "reasoning": "Task language indicates narrowing options."}
+    if any(k in text for k in ("review", "check", "audit", "validate", "verify", "inspect", "compliance")):
+        return {"shape": "checker", "modifiers": modifiers, "reasoning": "Task language indicates verification."}
+    if any(k in text for k in ("chapter", "section", "part", "module", "component")):
+        return {"shape": "tree", "modifiers": modifiers, "reasoning": "Task language indicates parallel independent parts."}
+    return {"shape": "pipeline", "modifiers": modifiers, "reasoning": "Task appears to require ordered sequential execution."}
 
 
 def _is_ambiguous(task: dict[str, Any], text: str) -> bool:
