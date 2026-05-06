@@ -12,6 +12,31 @@ class LLMProvider(ABC):
         """Return the assistant text response for a single turn."""
         ...
 
+    def complete_with_tools(
+        self,
+        system: str,
+        messages: list[dict],
+        tools: list[dict],
+        *,
+        max_tokens: int = 4096,
+        tool_choice: dict | None = None,
+    ) -> dict:
+        """
+        Return a tool-aware provider response.
+
+        Shape:
+        {"stop_reason": "end_turn"|"tool_use", "content": str|list, "tool_use": dict|None}
+
+        Providers without native tool support fall back to a single text completion.
+        """
+        user_text = "\n\n".join(
+            str(message.get("content", ""))
+            for message in messages
+            if message.get("role") == "user"
+        )
+        text = self.complete(system, user_text, max_tokens=max_tokens)
+        return {"stop_reason": "end_turn", "content": text, "tool_use": None}
+
     @property
     @abstractmethod
     def name(self) -> str:

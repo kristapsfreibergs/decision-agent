@@ -17,6 +17,10 @@ def decompose_software_task(
     repo_context = _repo_context(root)
     ambiguous = "needs_clarification" in set(goal_structure.get("modifiers", []))
 
+    task_title = task.get("title") or "Unnamed task"
+    task_description = task.get("description") or ""
+    task_context = f'Task: "{task_title}". {task_description}'.strip()
+
     packages: list[dict[str, Any]] = []
     human_questions: list[str] = []
 
@@ -27,7 +31,7 @@ def decompose_software_task(
                 "clarify_scope",
                 topology["phases"][0]["id"],
                 "planning",
-                "Clarify task scope, affected module, and acceptance checks before implementation.",
+                f"{task_context}\n\nClarify task scope, affected module, and acceptance checks before implementation. Use list_files and read_file to explore the codebase and understand what needs to change.",
                 ["docs/**", "backend/src/**", "public/**"],
                 ["docs/**"],
                 ["read_file", "list_files"],
@@ -42,11 +46,11 @@ def decompose_software_task(
                     "api_change",
                     _phase_for_slot(topology, ("scope", "assemble", "explore", "collect"), fallback=0),
                     "api",
-                    "Implement the required backend/API change in bounded source files.",
+                    f"{task_context}\n\nImplement the required backend/API change. Use list_files to find relevant files, read_file to understand existing code, then write_file to make the changes. Write complete, working code — not stubs.",
                     ["backend/src/**", "docs/**"],
                     ["backend/src/**"],
-                    ["read_file", "write_file", "list_files", "run_tests"],
-                    ["write_scope", "unit_tests"],
+                    ["read_file", "write_file", "list_files"],
+                    ["write_scope"],
                     ["summary", "files_changed", "public_api"],
                 )
             )
@@ -57,11 +61,11 @@ def decompose_software_task(
                     "ui_change",
                     _phase_for_slot(topology, ("assemble", "explore", "collect"), fallback=1),
                     "ui",
-                    "Update the operator-facing UI to expose the changed decision state or API surface.",
+                    f"{task_context}\n\nUpdate the operator-facing UI to expose the changed decision state or API surface. Use list_files to find relevant files, read_file to understand existing code, then write_file to make the changes.",
                     ["public/**", "backend/src/**"],
                     ["public/**"],
                     ["read_file", "write_file", "list_files"],
-                    ["write_scope", "manual_ui_check"],
+                    ["write_scope"],
                     ["summary", "files_changed", "ui_states"],
                 )
             )
@@ -72,11 +76,11 @@ def decompose_software_task(
                     "logic_change",
                     _phase_for_slot(topology, ("assemble", "explore"), fallback=1),
                     "logic",
-                    "Update internal logic or orchestration required by the task.",
+                    f"{task_context}\n\nUpdate internal logic or orchestration required by the task. Use list_files to find relevant files, read_file to understand existing code, then write_file to make the changes. Write complete, working code — not stubs.",
                     ["backend/src/**", "docs/**"],
                     ["backend/src/**"],
-                    ["read_file", "write_file", "list_files", "run_tests"],
-                    ["write_scope", "unit_tests"],
+                    ["read_file", "write_file", "list_files"],
+                    ["write_scope"],
                     ["summary", "files_changed", "behavior_changes"],
                 )
             )
@@ -87,10 +91,10 @@ def decompose_software_task(
                     "validation_check",
                     _phase_for_slot(topology, ("review", "verify", "converge", "decide", "adjudicate", "gate"), fallback=-1),
                     "validation",
-                    "Validate the implementation with focused tests and review.",
+                    f"{task_context}\n\nValidate the implementation with focused tests. Use list_files and read_file to understand what was changed, then write_file to write or update test files.",
                     ["backend/src/**", "backend/tests/**", "public/**"],
                     ["backend/tests/**"],
-                    ["read_file", "write_file", "list_files", "run_tests"],
+                    ["read_file", "write_file", "list_files"],
                     ["tests_run"],
                     ["summary", "files_changed", "test_commands"],
                 )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,10 +28,88 @@ from decision_agent.modules.runs.service import (
 )
 from decision_agent.modules.workers.runner import run_worker
 from decision_agent.settings import get_settings
+from decision_agent.shared.audit_log import append_audit_event
 from decision_agent.shared.providers.registry import get_provider
 
 ROOT = Path.cwd()
 SETTINGS = get_settings(ROOT)
+_ACTIVE_SCHEDULERS: set[str] = set()
+_SCHEDULER_LOCK = threading.Lock()
+
+
+def _execute_in_background(
+    run_id: str,
+    worker_id: str,
+    contract: dict,
+    audit_path: Path,
+    root: Path,
+    provider: object,
+) -> None:
+    try:
+        run_worker(run_id, worker_id, contract, audit_path, root, provider)
+    except Exception as exc:
+        append_audit_event(
+            audit_path,
+            {
+                "event": "worker_failed",
+                "run_id": run_id,
+                "worker_id": worker_id,
+                "error": str(exc),
+            },
+        )
+
+
+def _run_scheduler(run_id: str, root: Path, provider: object) -> None:
+    from decision_agent.modules.runs.scheduler import (
+        get_ready_worker_ids,
+        has_active_workers,
+        has_blocked_workers,
+        is_run_complete,
+    )
+
+    audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
+    try:
+        append_audit_event(audit_path, {"event": "scheduler_started", "run_id": run_id})
+        started: set[str] = set()
+
+        for _ in range(120):
+            run = read_run(run_id, root)
+            if not run:
+                break
+
+            all_contracts = run.get("generated_contracts", []) or run.get("contracts", [])
+            if not all_contracts:
+                break
+            if is_run_complete(run, all_contracts):
+                append_audit_event(audit_path, {"event": "scheduler_completed", "run_id": run_id})
+                break
+
+            ready = [
+                worker_id
+                for worker_id in get_ready_worker_ids(run, all_contracts)
+                if worker_id not in started
+            ]
+            if not ready and not has_active_workers(run, all_contracts) and has_blocked_workers(run, all_contracts):
+                append_audit_event(audit_path, {"event": "scheduler_blocked", "run_id": run_id})
+                break
+
+            for worker_id in ready:
+                contract = next(c for c in all_contracts if c["worker_id"] == worker_id)
+                started.add(worker_id)
+                append_audit_event(
+                    audit_path,
+                    {"event": "worker_assigned", "run_id": run_id, "worker_id": worker_id},
+                )
+                threading.Thread(
+                    target=_execute_in_background,
+                    args=(run_id, worker_id, contract, audit_path, root, provider),
+                    daemon=True,
+                ).start()
+
+            time.sleep(5)
+    finally:
+        with _SCHEDULER_LOCK:
+            _ACTIVE_SCHEDULERS.discard(run_id)
 
 
 class DecisionAgentHandler(SimpleHTTPRequestHandler):
@@ -192,6 +272,35 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
             self._send_json(run)
             return
 
+        # POST /api/runs/:run_id/schedule
+        m = re.fullmatch(r"/api/runs/([^/]+)/schedule", path)
+        if m:
+            run_id = m.group(1)
+            try:
+                run = read_run(run_id, ROOT)
+                if not run:
+                    self._send_json({"error": {"code": "not_found", "message": f"Run {run_id} not found"}}, status=HTTPStatus.NOT_FOUND)
+                    return
+                if not (run.get("generated_contracts") or run.get("contracts")):
+                    self._send_json({"error": {"code": "schedule_failed", "message": "No contracts exist for this run."}}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                with _SCHEDULER_LOCK:
+                    if run_id in _ACTIVE_SCHEDULERS:
+                        self._send_json({"run_id": run_id, "status": "already_scheduled"})
+                        return
+                    _ACTIVE_SCHEDULERS.add(run_id)
+                provider = get_provider()
+                threading.Thread(
+                    target=_run_scheduler,
+                    args=(run_id, ROOT, provider),
+                    daemon=True,
+                ).start()
+            except Exception as error:
+                self._send_json({"error": {"code": "schedule_failed", "message": str(error)}}, status=HTTPStatus.BAD_REQUEST)
+                return
+            self._send_json({"run_id": run_id, "status": "scheduled"})
+            return
+
         # POST /api/runs/:run_id/agents/:worker_id/message
         m = re.fullmatch(r"/api/runs/([^/]+)/agents/([^/]+)/message", path)
         if m:
@@ -260,11 +369,16 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
                     return
                 audit_path = ROOT / "data" / "runs" / run_id / "audit.jsonl"
                 provider = get_provider()
-                output = run_worker(run_id, worker_id, contract, audit_path, ROOT, provider)
+                thread = threading.Thread(
+                    target=_execute_in_background,
+                    args=(run_id, worker_id, contract, audit_path, ROOT, provider),
+                    daemon=True,
+                )
+                thread.start()
             except Exception as error:
                 self._send_json({"error": {"code": "execute_failed", "message": str(error)}}, status=HTTPStatus.BAD_REQUEST)
                 return
-            self._send_json({"worker_id": worker_id, "output": output})
+            self._send_json({"worker_id": worker_id, "status": "started"})
             return
 
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")

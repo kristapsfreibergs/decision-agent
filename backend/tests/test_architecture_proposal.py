@@ -112,11 +112,54 @@ class ArchitectureProposalTest(unittest.TestCase):
             run = generate_contracts_for_approved_architecture(run["run_id"], root)
 
             generated_dir = root / "data" / "runs" / run["run_id"] / "generated-contracts"
-            self.assertTrue((generated_dir / "api_worker.json").exists())
+            self.assertTrue((generated_dir / "ada_scope.json").exists())
+            self.assertTrue((generated_dir / "axel_review.json").exists())
             self.assertEqual(len(run["generated_contracts"]), 2)
+            review_contract = next(
+                contract for contract in run["generated_contracts"]
+                if contract["worker_id"] == "axel_review"
+            )
+            self.assertEqual(review_contract["depends_on"], ["ada_scope"])
             self.assertTrue((root / "data" / "runs" / run["run_id"] / "planning-artifact.json").exists())
             self.assertTrue(
                 any(event["event"] == "contracts_generation_completed" for event in run["audit"])
+            )
+
+    def test_software_code_task_injects_codebase_explorer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "backend" / "src" / "decision_agent").mkdir(parents=True)
+            (root / "public").mkdir()
+            (root / "docs").mkdir()
+            task = {
+                "task_id": "health-endpoint-test",
+                "title": "Add GET /api/health endpoint",
+                "description": "Add GET /api/health endpoint to backend/src/decision_agent/server.py",
+                "desired_outputs": ["backend change", "tests"],
+            }
+
+            run = create_run(task, root)
+            run = build_architecture_proposal(run["run_id"], root, MockProvider())
+            proposal_workers = [
+                worker["worker_id"]
+                for worker in run["architecture_proposal"]["workers"]
+            ]
+
+            self.assertIn("codebase_explorer", proposal_workers)
+            self.assertEqual(proposal_workers[0], "codebase_explorer")
+
+            run = approve_architecture(run["run_id"], "approved", root)
+            run = generate_contracts_for_approved_architecture(run["run_id"], root)
+            contracts = {
+                contract["worker_id"]: contract
+                for contract in run["generated_contracts"]
+            }
+
+            self.assertEqual(contracts["codebase_explorer"]["depends_on"], [])
+            self.assertIn("codebase_explorer", contracts["axel_scope"]["depends_on"])
+            self.assertIn(
+                f"data/runs/{run['run_id']}/outputs/codebase_explorer.json",
+                contracts["axel_scope"]["read_paths"],
             )
 
     def test_unsafe_generated_contract_is_rejected(self) -> None:

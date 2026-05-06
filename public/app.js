@@ -463,6 +463,9 @@ function renderArchitectureProposalPanel(run) {
           <button class="small-btn" id="generate-contracts" data-run="${escapeHtml(run.run_id)}">generate contracts</button>
         </div>` : ""}
       ${generatedContracts.length ? `
+        <div class="answer-box" style="margin-top:8px">
+          <button class="small-btn" id="schedule-run" data-run="${escapeHtml(run.run_id)}">▶ run all</button>
+        </div>
         <div class="section-label" style="margin-top:10px">contracts</div>
         <ul class="path-list">
           ${generatedContracts.map((c) => `<li><b>${escapeHtml(c.worker_id)}</b> · ${escapeHtml((c.write_paths ?? []).join(", "))}</li>`).join("")}
@@ -787,6 +790,14 @@ function render() {
     el.disabled = true;
     el.textContent = "running…";
     await api("POST", `/api/runs/${el.dataset.run}/agents/${el.dataset.worker}/execute`);
+    await load();
+  });
+
+  // Schedule all ready workers in dependency order
+  on("#schedule-run", "click", async (el) => {
+    el.disabled = true;
+    el.textContent = "scheduling…";
+    await api("POST", `/api/runs/${el.dataset.run}/schedule`);
     await load();
   });
 

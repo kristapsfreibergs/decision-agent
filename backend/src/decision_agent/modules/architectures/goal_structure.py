@@ -18,11 +18,22 @@ _SHAPE_DESCRIPTIONS = """
 - checker: verify claims or artifacts against criteria. Use for: code review, compliance audit, fact-checking, QA.
 """
 
+_INTAKE_SOURCES = """
+Available intake sources (workers that gather information before the main work begins):
+- codebase_explorer: reads source files, maps project structure, summarises relevant code. Use when the task requires modifying or understanding existing code.
+- web_researcher: searches the web for current information, prices, standards, news. Use when the task needs up-to-date external information.
+- document_reader: reads uploaded documents, PDFs, specs, contracts. Use when the task references attached documents.
+- knowledge_reader: reads from the project's persistent knowledge store. Use when past decisions or preferences are relevant.
+"""
+
 _SYSTEM = (
     "You are a task shape classifier. Given a task, select the best execution shape from this list:\n"
     + _SHAPE_DESCRIPTIONS
-    + "\nRespond with JSON only: {\"shape\": \"<shape>\", \"reasoning\": \"<one sentence>\", \"modifiers\": [\"needs_clarification\"?]}\n"
-    "Add needs_clarification to modifiers only if the task is genuinely underspecified (missing key details to proceed)."
+    + _INTAKE_SOURCES
+    + "\nRespond with JSON only: "
+    "{\"shape\": \"<shape>\", \"reasoning\": \"<one sentence>\", \"modifiers\": [...], \"intake_sources\": [...]}\n"
+    "modifiers: add \"needs_clarification\" only if task is genuinely underspecified. "
+    "intake_sources: list which intake sources this task needs (can be empty if the task needs no external information)."
 )
 
 
@@ -48,6 +59,7 @@ def classify_goal_structure(task: dict[str, Any], provider: Any = None) -> dict[
                 "shape": result["shape"],
                 "modifiers": all_modifiers,
                 "reasoning": result["reasoning"],
+                "intake_sources": result.get("intake_sources", []),
             }
 
     # Fallback: keyword heuristic
@@ -64,27 +76,36 @@ def _llm_classify(task: dict[str, Any], provider: Any) -> dict[str, Any] | None:
         shape = data.get("shape", "pipeline")
         if shape not in SHAPES:
             shape = "pipeline"
+        valid_sources = {"codebase_explorer", "web_researcher", "document_reader", "knowledge_reader"}
+        intake_sources = [s for s in data.get("intake_sources", []) if s in valid_sources]
         return {
             "shape": shape,
             "reasoning": data.get("reasoning", ""),
             "modifiers": [m for m in data.get("modifiers", []) if isinstance(m, str)],
+            "intake_sources": intake_sources,
         }
     except Exception:
         return None
 
 
 def _keyword_classify(text: str, modifiers: list[str]) -> dict[str, Any]:
+    intake: list[str] = []
+    if any(k in text for k in ("backend", "server", "api", "frontend", "code", "file", "class", "function", "endpoint", "module")):
+        intake.append("codebase_explorer")
+    if any(k in text for k in ("research", "market", "price", "news", "current", "latest", "web", "search")):
+        intake.append("web_researcher")
+
     if any(k in text for k in ("debate", "argue", "pros and cons", "counter", "position")):
-        return {"shape": "debate", "modifiers": modifiers, "reasoning": "Task language indicates adversarial comparison."}
+        return {"shape": "debate", "modifiers": modifiers, "reasoning": "Task language indicates adversarial comparison.", "intake_sources": intake}
     if any(k in text for k in ("research", "explore", "investigate", "discover", "survey")):
-        return {"shape": "search", "modifiers": modifiers, "reasoning": "Task language indicates exploration with convergence."}
+        return {"shape": "search", "modifiers": modifiers, "reasoning": "Task language indicates exploration with convergence.", "intake_sources": intake}
     if any(k in text for k in ("choose", "select", "rank", "prioritize", "screen", "shortlist")):
-        return {"shape": "funnel", "modifiers": modifiers, "reasoning": "Task language indicates narrowing options."}
+        return {"shape": "funnel", "modifiers": modifiers, "reasoning": "Task language indicates narrowing options.", "intake_sources": intake}
     if any(k in text for k in ("review", "check", "audit", "validate", "verify", "inspect", "compliance")):
-        return {"shape": "checker", "modifiers": modifiers, "reasoning": "Task language indicates verification."}
+        return {"shape": "checker", "modifiers": modifiers, "reasoning": "Task language indicates verification.", "intake_sources": intake}
     if any(k in text for k in ("chapter", "section", "part", "module", "component")):
-        return {"shape": "tree", "modifiers": modifiers, "reasoning": "Task language indicates parallel independent parts."}
-    return {"shape": "pipeline", "modifiers": modifiers, "reasoning": "Task appears to require ordered sequential execution."}
+        return {"shape": "tree", "modifiers": modifiers, "reasoning": "Task language indicates parallel independent parts.", "intake_sources": intake}
+    return {"shape": "pipeline", "modifiers": modifiers, "reasoning": "Task appears to require ordered sequential execution.", "intake_sources": intake}
 
 
 def _is_ambiguous(task: dict[str, Any], text: str) -> bool:

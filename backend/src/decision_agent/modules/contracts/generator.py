@@ -13,14 +13,30 @@ def instantiate_generated_contract(
     run: dict[str, Any],
 ) -> dict[str, Any]:
     run_id = run["run_id"]
+    package_to_worker = {
+        item.get("work_package_id", item["worker_id"]): item["worker_id"]
+        for item in proposal.get("workers", [])
+    }
     depends_on = [
-        dependency["on"]
+        package_to_worker.get(dependency["on"], dependency["on"])
         for dependency in proposal.get("dependencies", [])
         if dependency.get("from") == worker.get("work_package_id", worker["worker_id"])
     ]
     # Map dependency worker_ids to their output file paths so this worker can read prior results
     dep_output_paths = [f"data/runs/{run_id}/outputs/{dep_id}.json" for dep_id in depends_on]
-    read_paths = deepcopy(worker["read_paths"]) + [p for p in dep_output_paths if p not in worker["read_paths"]]
+
+    def _fix_paths(paths: list[str]) -> list[str]:
+        """Replace any stale run_id placeholder (e.g. 'preview') with the real run_id."""
+        result = []
+        for p in paths:
+            # Replace data/runs/<anything>/  with data/runs/<run_id>/
+            import re
+            p = re.sub(r"^(data/runs/)[^/]+(/.+)$", rf"\g<1>{run_id}\2", p)
+            result.append(p)
+        return result
+
+    raw_read_paths = _fix_paths(deepcopy(worker["read_paths"]))
+    read_paths = raw_read_paths + [p for p in dep_output_paths if p not in raw_read_paths]
 
     return {
         "worker_id": worker["worker_id"],
@@ -42,7 +58,7 @@ def instantiate_generated_contract(
         },
         "depends_on": depends_on,
         "read_paths": read_paths,
-        "write_paths": deepcopy(worker["write_paths"]),
+        "write_paths": _fix_paths(deepcopy(worker["write_paths"])),
         "allowed_tools": deepcopy(worker["allowed_tools"]),
         "max_steps": worker["max_steps"],
         "output_schema": deepcopy(worker["output_schema"]),

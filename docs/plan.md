@@ -1,3 +1,6 @@
+This is the short immediate plan. The full project roadmap is in
+[docs/build-plan.md](./build-plan.md).
+
 Next should be **make the cockpit control real backend state**, then add Claude as the first worker executor.
 
 **Step 1: Add Real Run State**

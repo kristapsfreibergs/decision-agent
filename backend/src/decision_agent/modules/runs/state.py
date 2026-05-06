@@ -22,6 +22,7 @@ WORKER_MESSAGE = "worker_message"
 WORKER_NEEDS_HUMAN = "worker_needs_human"
 WORKER_SUBMITTED = "worker_submitted"
 WORKER_HEARTBEAT = "worker_heartbeat"
+WORKER_FAILED = "worker_failed"
 
 # human interaction events
 HUMAN_ANSWERED = "human_answered"
@@ -77,6 +78,7 @@ AGENT_STATUS_BLOCKED = "blocked"
 AGENT_STATUS_SUBMITTED = "submitted"
 AGENT_STATUS_VALIDATED = "validated"
 AGENT_STATUS_REJECTED = "rejected"
+AGENT_STATUS_FAILED = "failed"
 
 # ---------------------------------------------------------------------------
 # State derivation
@@ -107,6 +109,7 @@ _WORKER_EVENT_TO_STATUS: dict[str, str] = {
     WORKER_SUBMITTED: AGENT_STATUS_SUBMITTED,
     VALIDATION_PASSED: AGENT_STATUS_VALIDATED,
     VALIDATION_FAILED: AGENT_STATUS_REJECTED,
+    WORKER_FAILED: AGENT_STATUS_FAILED,
 }
 
 

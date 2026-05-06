@@ -8,17 +8,21 @@ from typing import Any
 
 from decision_agent.modules.architectures.decomposers.software import decompose_software_task
 from decision_agent.modules.architectures.domains.story import build_story_decomposition
+from decision_agent.modules.architectures.domains.procurement import build_procurement_decomposition, EVIDENCE_PROFILE as PROCUREMENT_EVIDENCE_PROFILE, ACTION_GATE as PROCUREMENT_ACTION_GATE
 from decision_agent.modules.architectures.goal_structure import classify_goal_structure
 from decision_agent.modules.architectures.topology import build_topology
+from decision_agent.modules.workers.explorers import EXPLORER_CATALOG, build_explorer_package
 from decision_agent.shared.providers.base import LLMProvider
 
-_KNOWN_DOMAINS = {"story"}
+_KNOWN_DOMAINS = {"story", "procurement"}
 
 _DOMAIN_DETECT_SYSTEM = (
     "You are a task domain classifier. Given a task title and description, "
-    "decide if it belongs to one of these known domains: story. "
-    "A story domain task asks to write, create, draft, or generate a story, tale, narrative, fiction, or creative writing. "
-    "Respond with JSON only: {\"domain\": \"story\"} or {\"domain\": null}"
+    "decide if it belongs to one of these known domains: story, procurement. "
+    "- story: write, create, draft, or generate a story, tale, narrative, fiction, or creative writing. "
+    "- procurement: buy, purchase, source, tender, vendor selection, supplier evaluation, RFP, RFQ, "
+    "  contract award, spend approval, or supply chain decision. "
+    "Respond with JSON only: {\"domain\": \"story\"} or {\"domain\": \"procurement\"} or {\"domain\": null}"
 )
 
 
@@ -27,6 +31,8 @@ def _detect_domain(task: dict[str, Any], provider: LLMProvider | None) -> str | 
         text = f"{task.get('title', '')} {task.get('description', '')}".lower()
         if any(w in text for w in ("story", "tale", "narrative", "fiction", "novel", "fable", "write a")):
             return "story"
+        if any(w in text for w in ("procure", "procurement", "vendor", "supplier", "tender", "rfp", "rfq", "purchase", "sourcing", "contract award", "buy ")):
+            return "procurement"
         return None
     user = f"Task: {task.get('title', '')}\nDescription: {task.get('description', '') or 'none'}"
     try:
@@ -75,8 +81,24 @@ def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvid
             "topology_reasoning": "Story domain: parallel intake branches merge into sequential draft → refine → style.",
         }
         decomposition = build_story_decomposition(task, run["run_id"])
+    elif domain == "procurement":
+        goal_structure = {"shape": "funnel", "modifiers": ["human_gate_required", "high_risk"], "reasoning": "Procurement decisions funnel many vendor options through elimination and scoring to a single human-approved recommendation."}
+        topology = {
+            "shape": "funnel",
+            "phases": [
+                {"id": "intake",    "slot": "parallel_intake", "parallelizable": True,  "done_means": "Requirements, market research, and risk assessment complete."},
+                {"id": "evaluate",  "slot": "evaluate_vendors", "parallelizable": False, "done_means": "Vendors eliminated, scored, and shortlisted."},
+                {"id": "recommend", "slot": "recommend",        "parallelizable": False, "done_means": "Decision brief produced and ready for human review."},
+            ],
+            "dependency_model": "intake workers run in parallel; evaluator waits on all three; recommender waits on evaluator",
+            "completion_semantics": "done means recommendation_brief.md is produced and a human has reviewed it",
+            "gates": [{"id": "human_gate", "placement": "recommend", "rule": "Human approval required before any vendor commitment or spend."}],
+            "topology_reasoning": "Procurement domain: parallel intake (requirements + market + risk) feeds evaluator, then human-gated recommender.",
+        }
+        decomposition = build_procurement_decomposition(task, run["run_id"])
     else:
         goal_structure = classify_goal_structure(task, provider=provider)
+        goal_structure = _apply_intake_policy(goal_structure, run, task, root)
         topology = build_topology(goal_structure)
         if run["decision_type"] == "software_project_build_task":
             decomposition = decompose_software_task(task, topology, root, goal_structure)
@@ -86,6 +108,14 @@ def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvid
             decomposition = _generic_decomposition(task, topology, goal_structure)
 
     packages = decomposition["packages"]
+    dependencies = decomposition.get("dependencies", [])
+    explorer_packages = _build_intake_explorer_packages(goal_structure, run, task)
+    if explorer_packages:
+        packages, dependencies = _inject_explorer_packages(
+            explorer_packages,
+            packages,
+            dependencies,
+        )
     return {
         "planning_id": f"planning/{run['decision_type']}/{run['run_id']}",
         "run_id": run["run_id"],
@@ -93,16 +123,21 @@ def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvid
         "goal_structure": goal_structure,
         "topology": topology,
         "packages": packages,
-        "dependencies": decomposition.get("dependencies", []),
+        "dependencies": dependencies,
         "reasoning": {
             "goal_structure": goal_structure["reasoning"],
             "topology": topology["topology_reasoning"],
             "package_decomposition": decomposition["worker_count_reasoning"]["reason"],
         },
-        "package_outline": decomposition.get("package_outline", []),
+        "package_outline": [
+            {"id": package["id"], "work_layer": package["work_layer"], "phase_id": package["phase_id"]}
+            for package in packages
+        ],
         "worker_count_reasoning": decomposition["worker_count_reasoning"],
         "human_questions": decomposition.get("human_questions", []),
         "approval_status": "pending",
+        "evidence_profile": decomposition.get("evidence_profile"),
+        "action_gate": decomposition.get("action_gate"),
         "domain_context": {
             "domain": decomposition.get("domain", "generic"),
             "task_subtype": decomposition.get("task_subtype", "generic"),
@@ -110,6 +145,92 @@ def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvid
             "repo_context": decomposition.get("repo_context", {}),
         },
     }
+
+
+def _apply_intake_policy(
+    goal_structure: dict[str, Any],
+    run: dict[str, Any],
+    task: dict[str, Any],
+    root: Path,
+) -> dict[str, Any]:
+    sources = list(goal_structure.get("intake_sources", []))
+    reasons = list(goal_structure.get("intake_policy_reasoning", []))
+    text = " ".join(
+        str(value)
+        for value in [task.get("title"), task.get("description"), *(task.get("desired_outputs") or [])]
+        if value
+    ).lower()
+
+    if run.get("decision_type") == "software_project_build_task":
+        has_repo = (root / "backend").exists() or (root / "public").exists()
+        code_terms = (
+            "api",
+            "backend",
+            "frontend",
+            "server",
+            "endpoint",
+            "code",
+            "file",
+            "module",
+            "function",
+            "class",
+            "implement",
+            "add",
+        )
+        if has_repo and any(term in text for term in code_terms) and "codebase_explorer" not in sources:
+            sources.insert(0, "codebase_explorer")
+            reasons.append("software code-writing task requires codebase_explorer")
+
+    modifiers = list(goal_structure.get("modifiers", []))
+    if sources and "requires_intake" not in modifiers:
+        modifiers.append("requires_intake")
+
+    return {
+        **goal_structure,
+        "modifiers": sorted(set(modifiers)),
+        "intake_sources": sources,
+        "intake_policy_reasoning": reasons,
+    }
+
+
+def _build_intake_explorer_packages(
+    goal_structure: dict[str, Any],
+    run: dict[str, Any],
+    task: dict[str, Any],
+) -> list[dict[str, Any]]:
+    intake_sources = goal_structure.get("intake_sources", [])
+    if not isinstance(intake_sources, list):
+        return []
+    task_context = f"{task.get('title', '')}. {task.get('description') or ''}".strip()
+    return [
+        build_explorer_package(source, run["run_id"], task_context)
+        for source in intake_sources
+        if source in EXPLORER_CATALOG
+    ]
+
+
+def _inject_explorer_packages(
+    explorer_packages: list[dict[str, Any]],
+    packages: list[dict[str, Any]],
+    dependencies: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    explorer_ids = [package["id"] for package in explorer_packages]
+    package_ids = {package["id"] for package in packages}
+    existing_edges = {
+        (dependency.get("from"), dependency.get("on"))
+        for dependency in dependencies
+    }
+    extra_dependencies = [
+        {
+            "from": package_id,
+            "on": explorer_id,
+            "reason": f"Worker needs {explorer_id} context before starting.",
+        }
+        for package_id in package_ids
+        for explorer_id in explorer_ids
+        if (package_id, explorer_id) not in existing_edges
+    ]
+    return explorer_packages + packages, extra_dependencies + dependencies
 
 
 _NAMES = [
@@ -127,9 +248,10 @@ def _worker_id(phase_id: str, index: int) -> str:
 def artifact_to_proposal(artifact: dict[str, Any], run: dict[str, Any]) -> dict[str, Any]:
     workers = []
     for i, package in enumerate(artifact["packages"]):
+        worker_id = package.get("worker_id") or _worker_id(package["phase_id"], i)
         workers.append(
             {
-                "worker_id": _worker_id(package["phase_id"], i),
+                "worker_id": worker_id,
                 "work_package_id": package["id"],
                 "phase_id": package["phase_id"],
                 "worker_role": package["worker_role"],
@@ -156,7 +278,7 @@ def artifact_to_proposal(artifact: dict[str, Any], run: dict[str, Any]) -> dict[
         "worker_count_reasoning": deepcopy(artifact["worker_count_reasoning"]),
         "package_outline": deepcopy(artifact["package_outline"]),
         "human_questions": deepcopy(artifact["human_questions"]),
-        "evidence_profile": {
+        "evidence_profile": artifact.get("evidence_profile") or {
             "required_sources": ["task_request", "repository_structure", "local_docs"],
             "authority_weights": {"repository_structure": 0.95, "local_docs": 0.9, "task_request": 0.85},
             "conflict_rules": ["Bounded scope and validators override model preference."],
@@ -164,7 +286,7 @@ def artifact_to_proposal(artifact: dict[str, Any], run: dict[str, Any]) -> dict[
         "work_layers": _work_layers_for_packages(artifact["packages"]),
         "workers": workers,
         "dependencies": deepcopy(artifact["dependencies"]),
-        "action_gate": {
+        "action_gate": artifact.get("action_gate") or {
             "type": "human_gate",
             "requires_human_review": True,
             "automatic_final_action": False,

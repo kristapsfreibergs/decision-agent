@@ -9,10 +9,10 @@ from decision_agent.modules.runs.state import (
     VALIDATION_FAILED,
     VALIDATION_PASSED,
     WORKER_MESSAGE,
-    WORKER_NEEDS_HUMAN,
     WORKER_STARTED,
     WORKER_SUBMITTED,
 )
+from decision_agent.modules.workers.tools import TOOL_DEFINITIONS, execute_tool
 from decision_agent.shared.audit_log import append_audit_event
 from decision_agent.shared.providers.base import LLMProvider
 
@@ -39,10 +39,21 @@ Constraints:
 - Max steps: {contract.get("max_steps", 5)}
 - Completion contract: {contract.get("completion_contract", "")}
 
-IMPORTANT: Your response MUST be valid JSON matching this schema exactly:
-{output_schema}
+MANDATORY TOOL USE:
+- You MUST call your tools to do real work. Do NOT fabricate results.
+- If your goal involves reading files: call read_file or list_files FIRST.
+- If your goal involves writing or creating files: call write_file to actually write them.
+- If write_file is available in your tools, you MUST call write_file before your final JSON.
+- Do NOT claim files_changed unless you called write_file and it returned "OK:".
+- Do NOT summarise what you "would" do — actually do it with tools.
+- Produce the final JSON ONLY after your tool calls are complete.
 
-Do not include any text outside the JSON object. Do not add markdown fences."""
+OUTPUT RULES (strictly enforced):
+- Your ENTIRE final response must be ONE valid JSON object.
+- Start your response with {{ and end with }}.
+- No preamble, no explanation, no markdown, no code fences.
+- Schema you must match:
+{output_schema}"""
 
 
 def _build_user_prompt(contract: dict[str, Any], context_files: dict[str, str]) -> str:
@@ -52,7 +63,7 @@ def _build_user_prompt(contract: dict[str, Any], context_files: dict[str, str]) 
         f"Description: {task_ctx.get('task_summary', '')}",
         f"Router reason: {task_ctx.get('router_reason', '')}",
         "",
-        "Perform your work now and return the JSON result.",
+        "Start by calling list_files or read_file to explore the codebase. Then call write_file to make changes. Only return the final JSON after your tool calls are done.",
     ]
     if context_files:
         lines.append("\nAvailable context files:")
@@ -107,11 +118,48 @@ def _read_context_files(contract: dict[str, Any], project_root: Path) -> dict[st
 
 
 def _extract_json(text: str) -> dict[str, Any]:
-    """Extract first JSON object from text, stripping any markdown fences."""
-    # strip ```json fences
-    text = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.IGNORECASE)
-    text = re.sub(r"\s*```$", "", text.strip())
-    return json.loads(text)
+    """Extract first JSON object from text, handling prose preamble and markdown fences."""
+    # Try direct parse first (clean response)
+    stripped = text.strip()
+    # Strip ```json fences if present
+    stripped = re.sub(r"^```(?:json)?\s*", "", stripped, flags=re.IGNORECASE)
+    stripped = re.sub(r"\s*```\s*$", "", stripped.strip())
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Find the first { and try to parse a JSON object from there
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("No JSON object found in response")
+    # Find the matching closing brace using a stack
+    depth = 0
+    in_string = False
+    escape_next = False
+    end = -1
+    for i, ch in enumerate(text[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end == -1:
+        raise ValueError("Unterminated JSON object in response")
+    return json.loads(text[start:end + 1])
 
 
 def _validate_output(output: dict[str, Any], schema: dict[str, Any]) -> list[str]:
@@ -149,6 +197,14 @@ def _write_worker_output(
     return output_path.relative_to(project_root).as_posix()
 
 
+def _minimum_tool_requirement_met(called_tools: list[str], allowed_tools: list[str]) -> bool:
+    if "write_file" in allowed_tools:
+        return "write_file" in called_tools
+    if any(tool in allowed_tools for tool in ("read_file", "list_files", "run_tests")):
+        return bool(called_tools)
+    return True
+
+
 def run_worker(
     run_id: str,
     worker_id: str,
@@ -177,9 +233,76 @@ def run_worker(
     system = _build_system_prompt(contract)
     user = _build_user_prompt(contract, context_files)
 
-    raw_response = provider.complete(system, user)
+    allowed_tools = contract.get("allowed_tools", [])
+    active_tool_defs = [
+        tool
+        for tool in TOOL_DEFINITIONS
+        if tool["name"] in allowed_tools
+    ]
 
-    emit(WORKER_MESSAGE, role="agent", text=raw_response[:500])  # truncate for audit
+    messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
+    max_steps = contract.get("max_steps", 6)
+    raw_response = ""
+    called_tools: list[str] = []
+
+    for _ in range(max_steps):
+        # Only force tool use on the very first turn (no tools called yet, no prior tool results).
+        # After a tool_result message, Anthropic rejects tool_choice:"any" paired with the result.
+        first_turn = len(called_tools) == 0 and len(messages) == 1
+        force_tool = first_turn and bool(active_tool_defs) and not _minimum_tool_requirement_met(
+            called_tools,
+            allowed_tools,
+        )
+        response = provider.complete_with_tools(
+            system,
+            messages,
+            active_tool_defs,
+            tool_choice={"type": "any"} if force_tool else None,
+        )
+        if response["stop_reason"] == "tool_use":
+            tool = response["tool_use"]
+            if not tool:
+                emit(VALIDATION_FAILED, reason="Provider returned tool_use without a tool payload.")
+                raise ValueError(f"Worker {worker_id} returned an invalid tool_use response.")
+
+            messages.append({"role": "assistant", "content": response["content"]})
+            result = execute_tool(
+                tool["name"],
+                tool.get("input", {}),
+                contract,
+                project_root,
+                lambda event, **extra: emit(event, **extra),
+            )
+            called_tools.append(tool["name"])
+            emit(WORKER_MESSAGE, role="tool", tool=tool["name"], result=result[:200])
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool["id"],
+                            "content": result,
+                        }
+                    ],
+                }
+            )
+            continue
+
+        if not _minimum_tool_requirement_met(called_tools, allowed_tools):
+            emit(
+                VALIDATION_FAILED,
+                reason="Provider returned final text before required tool use.",
+            )
+            raise ValueError(f"Worker {worker_id} returned final text before required tool use.")
+
+        raw_response = str(response["content"])
+        emit(WORKER_MESSAGE, role="agent", text=raw_response[:500])  # truncate for audit
+        break
+
+    if not raw_response:
+        emit(VALIDATION_FAILED, reason=f"Worker exceeded max_steps={max_steps} before final JSON.")
+        raise ValueError(f"Worker {worker_id} exceeded max_steps before returning final JSON.")
 
     # Parse
     try:
