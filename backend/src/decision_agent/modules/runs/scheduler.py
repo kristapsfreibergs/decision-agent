@@ -9,13 +9,32 @@ from decision_agent.modules.runs.state import (
     AGENT_STATUS_REJECTED,
     AGENT_STATUS_VALIDATED,
     AGENT_STATUS_WORKING,
+    PHASE_GATE_APPROVED,
 )
 
 TERMINAL_STATUSES = {AGENT_STATUS_VALIDATED, AGENT_STATUS_REJECTED, AGENT_STATUS_FAILED}
 
 
-def get_ready_worker_ids(run: dict[str, Any], all_contracts: list[dict[str, Any]]) -> list[str]:
-    """Return worker IDs that are ready to execute: planned/assigned + all deps validated."""
+def is_phase_gate_cleared(run: dict[str, Any], phase_id: str | None, gates: list[dict[str, Any]]) -> bool:
+    """Return True if there is no gate for this phase, or if the gate has been approved."""
+    if not phase_id:
+        return True
+    phase_gate = next((g for g in gates if g.get("placement") == phase_id), None)
+    if phase_gate is None:
+        return True
+    return any(
+        e.get("event") == PHASE_GATE_APPROVED and e.get("phase_id") == phase_id
+        for e in run.get("audit", [])
+    )
+
+
+def get_ready_worker_ids(
+    run: dict[str, Any],
+    all_contracts: list[dict[str, Any]],
+    gates: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    """Return worker IDs that are ready to execute: planned/assigned + all deps validated + phase gate cleared."""
+    gates = gates or []
     statuses = run.get("worker_statuses", {})
     deps_map = {
         contract["worker_id"]: contract.get("depends_on", [])
@@ -27,6 +46,8 @@ def get_ready_worker_ids(run: dict[str, Any], all_contracts: list[dict[str, Any]
         worker_id = contract["worker_id"]
         status = statuses.get(worker_id, AGENT_STATUS_PLANNED)
         if status not in (AGENT_STATUS_PLANNED, AGENT_STATUS_ASSIGNED):
+            continue
+        if not is_phase_gate_cleared(run, contract.get("phase_id"), gates):
             continue
         deps = deps_map.get(worker_id, [])
         if all(statuses.get(dep) == AGENT_STATUS_VALIDATED for dep in deps):

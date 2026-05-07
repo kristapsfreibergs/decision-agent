@@ -35,6 +35,10 @@ VALIDATION_FAILED = "validation_failed"
 GATE_APPROVED = "gate_approved"
 GATE_REJECTED = "gate_rejected"
 
+# phase gate events (mid-run; do NOT map to run_completed)
+PHASE_GATE_APPROVED = "phase_gate_approved"
+PHASE_GATE_REJECTED = "phase_gate_rejected"
+
 # architecture proposal events
 ARCHITECTURE_BUILD_STARTED = "architecture_build_started"
 GOAL_STRUCTURE_CLASSIFIED = "goal_structure_classified"
@@ -130,6 +134,8 @@ def derive_worker_statuses(events: list[dict[str, Any]]) -> dict[str, str]:
         name = event.get("event", "")
         worker_id = event.get("worker_id")
         if worker_id and name in _WORKER_EVENT_TO_STATUS:
+            if statuses.get(worker_id) == AGENT_STATUS_VALIDATED and name == WORKER_SUBMITTED:
+                continue
             statuses[worker_id] = _WORKER_EVENT_TO_STATUS[name]
         elif name in (CONTRACT_CREATED, GENERATED_CONTRACT_CREATED) and worker_id:
             statuses.setdefault(worker_id, AGENT_STATUS_PLANNED)

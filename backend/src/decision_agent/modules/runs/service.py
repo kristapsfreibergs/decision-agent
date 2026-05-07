@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -82,12 +83,32 @@ def _read_planning_artifact(run_dir: Path) -> dict[str, Any] | None:
     return _read_json(run_dir / "planning-artifact.json")
 
 
-def _read_contracts_dir(contracts_dir: Path) -> list[dict[str, Any]]:
+_RUN_PATH_RE = re.compile(r"^(data/runs/)[^/]+(/.+)$")
+
+
+def _normalize_contract_run_paths(contract: dict[str, Any], run_id: str) -> dict[str, Any]:
+    """Repair stale generated contracts that still contain preview run paths."""
+    normalized = deepcopy(contract)
+    normalized["run_id"] = run_id
+    for field in ("read_paths", "write_paths"):
+        paths = normalized.get(field)
+        if not isinstance(paths, list):
+            continue
+        normalized[field] = [
+            _RUN_PATH_RE.sub(rf"\g<1>{run_id}\2", path) if isinstance(path, str) else path
+            for path in paths
+        ]
+    return normalized
+
+
+def _read_contracts_dir(contracts_dir: Path, run_id: str | None = None) -> list[dict[str, Any]]:
     contracts = []
     if contracts_dir.exists():
         for contract_file in sorted(contracts_dir.glob("*.json")):
             contract = _read_json(contract_file)
             if contract:
+                if run_id is not None:
+                    contract = _normalize_contract_run_paths(contract, run_id)
                 contracts.append(contract)
     return contracts
 
@@ -219,8 +240,9 @@ def _load_run(run_dir: Path) -> dict[str, Any] | None:
     record = _read_json(run_dir / "run-record.json")
     if not record:
         return None
-    contracts = _read_contracts_dir(run_dir / "contracts")
-    generated_contracts = _read_contracts_dir(run_dir / "generated-contracts")
+    run_id = record["run_id"]
+    contracts = _read_contracts_dir(run_dir / "contracts", run_id)
+    generated_contracts = _read_contracts_dir(run_dir / "generated-contracts", run_id)
     audit = read_audit(run_dir / "audit.jsonl")
     return enrich_run(
         {

@@ -113,13 +113,43 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function formatAgo(timestamp) {
+  if (!timestamp) return "no activity yet";
+  const then = new Date(timestamp).getTime();
+  if (!Number.isFinite(then)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (seconds < 10) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ago`;
+}
+
+function workerLastEvent(run, workerId) {
+  return (run.audit ?? []).slice().reverse().find((event) => event.worker_id === workerId) ?? null;
+}
+
+function runActivitySummary(run, agents) {
+  const counts = agents.reduce((acc, agent) => {
+    acc[agent.state] = (acc[agent.state] ?? 0) + 1;
+    return acc;
+  }, {});
+  const lastEvent = (run.audit ?? []).slice().reverse().find((event) => event.timestamp) ?? null;
+  const active = (counts.working ?? 0) + (counts.assigned ?? 0);
+  if (active) return `${active} active · last event ${formatAgo(lastEvent?.timestamp)}`;
+  if (counts.failed || counts.rejected) return `${counts.failed ?? 0} failed · last event ${formatAgo(lastEvent?.timestamp)}`;
+  if (counts.planned) return `${counts.planned} waiting · last event ${formatAgo(lastEvent?.timestamp)}`;
+  return `last event ${formatAgo(lastEvent?.timestamp)}`;
+}
+
 function latestRun() {
   return dashboard?.runs?.[0] ?? null;
 }
 
 function activeArchitecture() {
   const run = latestRun();
-  return dashboard?.architectures?.find((a) => a.id === run?.architecture_id)
+  return run?.architecture_proposal
+    ?? dashboard?.architectures?.find((a) => a.id === run?.architecture_id)
     ?? dashboard?.architectures?.[0]
     ?? null;
 }
@@ -127,13 +157,8 @@ function activeArchitecture() {
 function agentsFromRun(run) {
   if (!run) return [];
   const workerStatuses = run.worker_statuses ?? {};
-
-  const allContracts = [
-    ...(run.contracts ?? []),
-    ...(run.generated_contracts ?? []).filter(
-      (gc) => !(run.contracts ?? []).some((c) => c.worker_id === gc.worker_id)
-    ),
-  ];
+  const generatedContracts = run.generated_contracts ?? [];
+  const allContracts = generatedContracts.length ? generatedContracts : (run.contracts ?? []);
 
   const agents = allContracts.map((contract) => {
     const meta = WORKER_META[contract.worker_id] ?? {};
@@ -142,6 +167,7 @@ function agentsFromRun(run) {
     const needsHuman = status === "needs_human";
     const isRejected = status === "rejected";
     const lastMessage = messages.length ? messages[messages.length - 1] : null;
+    const lastEvent = workerLastEvent(run, contract.worker_id);
     // Find the pending question (last worker_needs_human event)
     const pendingQuestion = messages.slice().reverse().find((m) => m.event === "worker_needs_human")?.text ?? null;
     // Find the last failure reason
@@ -160,6 +186,8 @@ function agentsFromRun(run) {
       needsAnswerFrom: needsHuman ? "you" : null,
       pendingQuestion,
       lastFailure,
+      lastEvent,
+      lastActivity: formatAgo(lastEvent?.timestamp),
       messages,
     };
   });
@@ -362,9 +390,10 @@ function renderCanvas(agents) {
     const pos = agentPosition(agent, agents);
     const selected = selectedAgentId === agent.id ? "selected" : "";
     return `
-      <button class="agent ${selected}" style="left:${pos.x}%;top:${pos.y}%" data-agent="${escapeHtml(agent.id)}">
+      <button class="agent agent--${escapeHtml(agent.state)} ${selected}" style="left:${pos.x}%;top:${pos.y}%" data-agent="${escapeHtml(agent.id)}">
         ${avatar(agent)}
         <span class="agent-name">${escapeHtml(agent.name)}</span>
+        ${["working", "assigned"].includes(agent.state) ? `<span class="agent-note">${escapeHtml(agent.state)} · ${escapeHtml(agent.lastActivity)}</span>` : ""}
       </button>`;
   }).join("");
 
@@ -422,6 +451,38 @@ function hasEvent(run, eventName) {
   return (run.audit ?? []).some((event) => event.event === eventName);
 }
 
+function pendingPhaseGates(run) {
+  const proposal = run.architecture_proposal;
+  if (!proposal) return [];
+  const gates = proposal.topology?.gates ?? [];
+  if (!gates.length) return [];
+
+  const allContracts = (run.generated_contracts?.length ? run.generated_contracts : run.contracts) ?? [];
+  const statuses = run.worker_statuses ?? {};
+  const audit = run.audit ?? [];
+
+  return gates.filter((gate) => {
+    const phaseId = gate.placement;
+    // Already approved?
+    if (audit.some((e) => e.event === "phase_gate_approved" && e.phase_id === phaseId)) return false;
+    // Already rejected?
+    if (audit.some((e) => e.event === "phase_gate_rejected" && e.phase_id === phaseId)) return false;
+    // The phase gate only makes sense to show when previous phases are all validated
+    // (i.e. some workers in the gated phase exist but deps are done)
+    const gatedWorkers = allContracts.filter((c) => c.phase_id === phaseId);
+    if (!gatedWorkers.length) return false;
+    // All workers in the gated phase must be planned/assigned (not yet running)
+    const allPlanned = gatedWorkers.every((c) => {
+      const s = statuses[c.worker_id] ?? "planned";
+      return s === "planned" || s === "assigned";
+    });
+    if (!allPlanned) return false;
+    // At least one worker in a prior phase must be validated
+    const priorPhaseWorkers = allContracts.filter((c) => c.phase_id !== phaseId);
+    return priorPhaseWorkers.some((c) => statuses[c.worker_id] === "validated");
+  });
+}
+
 function renderArchitectureProposalPanel(run) {
   if (!architecturePanelOpen) return "";
 
@@ -466,6 +527,15 @@ function renderArchitectureProposalPanel(run) {
         <div class="answer-box" style="margin-top:8px">
           <button class="small-btn" id="schedule-run" data-run="${escapeHtml(run.run_id)}">▶ run all</button>
         </div>
+        ${pendingPhaseGates(run).map((gate) => `
+          <div class="detail-section hot" style="margin-top:10px;padding:8px">
+            <div class="section-label">phase gate — ${escapeHtml(gate.placement)}</div>
+            <div class="mini" style="opacity:.8;margin:4px 0">${escapeHtml(gate.rule ?? "Human approval required before this phase.")}</div>
+            <div class="answer-box" style="margin-top:6px">
+              <button class="small-btn phase-gate-approve" data-run="${escapeHtml(run.run_id)}" data-phase="${escapeHtml(gate.placement)}">approve phase</button>
+              <button class="small-btn phase-gate-reject" data-run="${escapeHtml(run.run_id)}" data-phase="${escapeHtml(gate.placement)}" style="background:#c43a3a">reject phase</button>
+            </div>
+          </div>`).join("")}
         <div class="section-label" style="margin-top:10px">contracts</div>
         <ul class="path-list">
           ${generatedContracts.map((c) => `<li><b>${escapeHtml(c.worker_id)}</b> · ${escapeHtml((c.write_paths ?? []).join(", "))}</li>`).join("")}
@@ -496,7 +566,7 @@ function renderDetails(agent, run, architecture, allAgents = []) {
         <div class="detail-main">
           <div class="detail-name">${escapeHtml(agent.name)}</div>
           <div class="detail-role">${escapeHtml(disc.short)} · ${escapeHtml(contract.layer ?? agent.zone)}</div>
-          <div class="mini">${escapeHtml(state.label)}</div>
+          <div class="mini">${escapeHtml(state.label)} · ${escapeHtml(agent.lastActivity)}</div>
         </div>
         <button class="close" id="clear-selection">×</button>
       </div>
@@ -512,6 +582,8 @@ function renderDetails(agent, run, architecture, allAgents = []) {
       </section>` : `
       <section class="detail-section ${agent.state === "rejected" ? "blocked" : ""}">
         <div class="section-label">currently</div>
+        ${["working", "assigned"].includes(agent.state) ? `
+          <div class="activity-strip">running · last activity ${escapeHtml(agent.lastActivity)}</div>` : ""}
         <div class="mini">${escapeHtml(agent.task)}</div>
         ${agent.state === "rejected" && agent.lastFailure ? `
           <div class="mini" style="color:var(--red);margin-top:6px">${escapeHtml(agent.lastFailure)}</div>` : ""}
@@ -630,13 +702,14 @@ function renderMission(run, architecture, agents) {
   const canStart = run.status === "ready";
   const proposalStatus = architectureProposalStatus(run);
   const generatedCount = run.generated_contracts?.length ?? 0;
+  const activity = runActivitySummary(run, agents);
   return `
     <section class="mission">
       <div class="goal-line">
         <span class="goal-label">GOAL</span>
         <span class="goal-title">${escapeHtml(goal)}</span>
         <span class="goal-progress"><span style="width:${progress}%"></span><b>${progress}%</b></span>
-        <span class="mini" style="margin-left:12px;opacity:.6">${escapeHtml(run.status)}</span>
+        <span class="run-status">${escapeHtml(run.status)} · ${escapeHtml(activity)}</span>
         <button class="small-btn arch-btn" id="architecture-open" data-run="${escapeHtml(run.run_id)}">architecture ${escapeHtml(proposalStatus)}${generatedCount ? ` · ${generatedCount} contracts` : ""}</button>
       </div>
       <div class="control-row">
@@ -824,6 +897,29 @@ function render() {
     await load();
   });
 
+  // Phase gate approve (mid-run, does not complete the run)
+  on(".phase-gate-approve", "click", async (el) => {
+    el.disabled = true;
+    el.textContent = "approving…";
+    try {
+      await api("POST", `/api/runs/${el.dataset.run}/phase-gate/approve`, { phase_id: el.dataset.phase });
+    } catch (err) {
+      alert(`Failed to approve phase gate: ${err?.message ?? err}`);
+    }
+    await load();
+  });
+
+  // Phase gate reject (mid-run)
+  on(".phase-gate-reject", "click", async (el) => {
+    const reason = prompt("Reason for rejecting this phase?") ?? "";
+    try {
+      await api("POST", `/api/runs/${el.dataset.run}/phase-gate/reject`, { phase_id: el.dataset.phase, reason });
+    } catch (err) {
+      alert(`Failed to reject phase gate: ${err?.message ?? err}`);
+    }
+    await load();
+  });
+
   bindTaskComposerEvents();
 }
 
@@ -944,6 +1040,21 @@ async function load() {
   render();
 }
 
+let loadingDashboard = false;
+async function refreshDashboard() {
+  if (loadingDashboard) return;
+  loadingDashboard = true;
+  try {
+    await load();
+  } finally {
+    loadingDashboard = false;
+  }
+}
+
 load().catch((err) => {
   app.innerHTML = `<pre>${escapeHtml(err.stack ?? err.message)}</pre>`;
 });
+
+setInterval(() => {
+  refreshDashboard().catch(() => {});
+}, 2500);
