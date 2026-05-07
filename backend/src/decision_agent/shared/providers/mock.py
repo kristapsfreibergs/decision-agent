@@ -5,22 +5,36 @@ import json
 from decision_agent.shared.providers.base import LLMProvider
 
 
-def _extract_schema(system: str) -> dict:
-    start = system.find("{")
-    if start == -1:
-        return {}
+_SCHEMA_ANCHOR = "Schema you must match:"
 
-    depth = 0
-    for index, char in enumerate(system[start:], start=start):
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(system[start : index + 1])
-                except json.JSONDecodeError:
-                    return {}
+
+def _extract_schema(system: str) -> dict:
+    """Find the JSON schema embedded after the 'Schema you must match:' anchor.
+
+    Falls back to the first balanced JSON object if the anchor is absent.
+    """
+    anchor_pos = system.find(_SCHEMA_ANCHOR)
+    search_start = anchor_pos + len(_SCHEMA_ANCHOR) if anchor_pos != -1 else 0
+    cursor = search_start
+    while cursor < len(system):
+        start = system.find("{", cursor)
+        if start == -1:
+            return {}
+        depth = 0
+        for index, char in enumerate(system[start:], start=start):
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    snippet = system[start : index + 1]
+                    try:
+                        return json.loads(snippet)
+                    except json.JSONDecodeError:
+                        cursor = index + 1
+                        break
+        else:
+            return {}
     return {}
 
 

@@ -11,6 +11,7 @@ class AnthropicProvider(LLMProvider):
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         self._model = model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        self._timeout = float(os.environ.get("ANTHROPIC_TIMEOUT_SECONDS", "180"))
         if not self._api_key:
             raise ValueError("ANTHROPIC_API_KEY is not set.")
 
@@ -26,7 +27,7 @@ class AnthropicProvider(LLMProvider):
                 "anthropic package is not installed. Run: pip install anthropic"
             ) from exc
 
-        client = anthropic.Anthropic(api_key=self._api_key)
+        client = anthropic.Anthropic(api_key=self._api_key, timeout=self._timeout, max_retries=1)
         message = client.messages.create(
             model=self._model,
             max_tokens=max_tokens,
@@ -60,7 +61,7 @@ class AnthropicProvider(LLMProvider):
                 "anthropic package is not installed. Run: pip install anthropic"
             ) from exc
 
-        client = anthropic.Anthropic(api_key=self._api_key)
+        client = anthropic.Anthropic(api_key=self._api_key, timeout=self._timeout, max_retries=1)
         request: dict = {
             "model": self._model,
             "max_tokens": max_tokens,
