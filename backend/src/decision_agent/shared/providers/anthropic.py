@@ -73,19 +73,25 @@ class AnthropicProvider(LLMProvider):
 
         response = client.messages.create(**request)
         if response.stop_reason == "tool_use":
-            tool_block = next(block for block in response.content if block.type == "tool_use")
+            tool_blocks = [block for block in response.content if block.type == "tool_use"]
+            tool_uses = [
+                {
+                    "id": block.id,
+                    "name": block.name,
+                    "input": block.input,
+                }
+                for block in tool_blocks
+            ]
             return {
                 "stop_reason": "tool_use",
                 "content": [_content_block_to_dict(block) for block in response.content],
-                "tool_use": {
-                    "id": tool_block.id,
-                    "name": tool_block.name,
-                    "input": tool_block.input,
-                },
+                "tool_use": tool_uses[0] if tool_uses else None,
+                "tool_uses": tool_uses,
+                "tool_capable": True,
             }
 
         text = next((block.text for block in response.content if hasattr(block, "text")), "")
-        return {"stop_reason": "end_turn", "content": text, "tool_use": None}
+        return {"stop_reason": "end_turn", "content": text, "tool_use": None, "tool_capable": True}
 
 
 def _content_block_to_dict(block: object) -> dict:

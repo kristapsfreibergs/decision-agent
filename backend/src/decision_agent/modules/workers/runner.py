@@ -12,6 +12,7 @@ from decision_agent.modules.runs.state import (
     WORKER_STARTED,
     WORKER_SUBMITTED,
 )
+from decision_agent.modules.contracts.output_validator import validate_contractual_output
 from decision_agent.modules.workers.tools import TOOL_DEFINITIONS, execute_tool
 from decision_agent.shared.audit_log import append_audit_event
 from decision_agent.shared.providers.base import LLMProvider
@@ -260,36 +261,39 @@ def run_worker(
             tool_choice={"type": "any"} if force_tool else None,
         )
         if response["stop_reason"] == "tool_use":
-            tool = response["tool_use"]
-            if not tool:
+            tool_uses = response.get("tool_uses") or ([response.get("tool_use")] if response.get("tool_use") else [])
+            if not tool_uses:
                 emit(VALIDATION_FAILED, reason="Provider returned tool_use without a tool payload.")
                 raise ValueError(f"Worker {worker_id} returned an invalid tool_use response.")
 
             messages.append({"role": "assistant", "content": response["content"]})
-            result = execute_tool(
-                tool["name"],
-                tool.get("input", {}),
-                contract,
-                project_root,
-                lambda event, **extra: emit(event, **extra),
-            )
-            called_tools.append(tool["name"])
-            emit(WORKER_MESSAGE, role="tool", tool=tool["name"], result=result[:200])
+            tool_results = []
+            for tool in tool_uses:
+                result = execute_tool(
+                    tool["name"],
+                    tool.get("input", {}),
+                    contract,
+                    project_root,
+                    lambda event, **extra: emit(event, **extra),
+                )
+                called_tools.append(tool["name"])
+                emit(WORKER_MESSAGE, role="tool", tool=tool["name"], result=result[:200])
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool["id"],
+                        "content": result,
+                    }
+                )
             messages.append(
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool["id"],
-                            "content": result,
-                        }
-                    ],
+                    "content": tool_results,
                 }
             )
             continue
 
-        if not _minimum_tool_requirement_met(called_tools, allowed_tools):
+        if response.get("tool_capable") is not False and not _minimum_tool_requirement_met(called_tools, allowed_tools):
             emit(
                 VALIDATION_FAILED,
                 reason="Provider returned final text before required tool use.",
@@ -317,6 +321,12 @@ def run_worker(
     if issues:
         emit(VALIDATION_FAILED, reason="; ".join(issues))
         raise ValueError(f"Worker {worker_id} output failed schema validation: {'; '.join(issues)}")
+
+    # Run contractual output validators (evidence_sources_declared, write_scope, etc.)
+    contract_issues = validate_contractual_output(output, contract)
+    if contract_issues:
+        emit(VALIDATION_FAILED, reason="; ".join(contract_issues))
+        raise ValueError(f"Worker {worker_id} failed contractual validation: {'; '.join(contract_issues)}")
 
     output_file = _write_worker_output(project_root, run_id, worker_id, output)
     emit(VALIDATION_PASSED)

@@ -35,7 +35,12 @@ class LLMProvider(ABC):
             if message.get("role") == "user"
         )
         text = self.complete(system, user_text, max_tokens=max_tokens)
-        return {"stop_reason": "end_turn", "content": text, "tool_use": None}
+        return {
+            "stop_reason": "end_turn",
+            "content": text,
+            "tool_use": None,
+            "tool_capable": False,
+        }
 
     @property
     @abstractmethod

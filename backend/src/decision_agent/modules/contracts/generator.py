@@ -63,6 +63,7 @@ def instantiate_generated_contract(
         "max_steps": worker["max_steps"],
         "output_schema": deepcopy(worker["output_schema"]),
         "validators": deepcopy(worker["validators"]),
+        "evidence_profile": deepcopy(proposal.get("evidence_profile") or {}),
         "completion_contract": worker["completion_contract"],
         "generated_from": "architecture-proposal.json",
     }

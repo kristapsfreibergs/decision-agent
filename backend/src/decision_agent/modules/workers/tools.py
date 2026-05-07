@@ -100,9 +100,11 @@ def execute_tool(
         pattern = str(params.get("pattern", ""))
         if not _within_read_paths(pattern, contract.get("read_paths", []), project_root):
             return f"ERROR: pattern '{pattern}' is outside contract read_paths"
+        glob_pattern = _file_glob_pattern(pattern)
+        root = project_root.resolve()
         matches = sorted(
-            path.relative_to(project_root.resolve()).as_posix()
-            for path in project_root.glob(pattern)
+            path.resolve().relative_to(root).as_posix()
+            for path in project_root.glob(glob_pattern)
             if path.is_file() and _is_under_root(path, project_root)
         )
         audit_emit("tool_called", tool="list_files", pattern=pattern, count=len(matches))
@@ -123,7 +125,12 @@ def execute_tool(
     if name == "web_search":
         query = str(params.get("query", ""))
         audit_emit("tool_called", tool="web_search", query=query, supported=False)
-        return "ERROR: web_search is not implemented in the local worker tool provider yet."
+        return (
+            "web_search is not available in this environment. "
+            f"Query was: '{query}'. "
+            "Fall back to knowledge/procurement/markets/ for vendor and pricing data. "
+            "Call list_files to discover available files, then read_file to access them."
+        )
 
     return f"ERROR: unknown tool '{name}'"
 
@@ -163,6 +170,14 @@ def _run_tests(command: str, project_root: Path) -> subprocess.CompletedProcess[
         timeout=120,
         check=False,
     )
+
+
+def _file_glob_pattern(pattern: str) -> str:
+    """Treat directory-recursive patterns like knowledge/** as file searches."""
+    normalized = pattern.rstrip("/")
+    if normalized.endswith("/**"):
+        return f"{normalized}/*"
+    return pattern
 
 
 def _within_read_paths(path_or_pattern: str, read_paths: list[str], project_root: Path) -> bool:

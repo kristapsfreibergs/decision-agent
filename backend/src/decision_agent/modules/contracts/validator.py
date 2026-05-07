@@ -23,7 +23,7 @@ def validate_worker_contract(contract: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(value, list):
             issues.append(f"{field} must be an array.")
             continue
-        if not value:
+        if not value and field != "allowed_tools":
             issues.append(f"{field} must not be empty.")
         if any(not isinstance(item, str) or not item.strip() for item in value):
             issues.append(f"{field} contains an invalid value.")
@@ -75,4 +75,3 @@ def validate_architecture(architecture: dict[str, Any]) -> dict[str, Any]:
 
 def validate_contract_file(file_path: Path) -> dict[str, Any]:
     return validate_worker_contract(json.loads(file_path.read_text(encoding="utf-8")))
-
