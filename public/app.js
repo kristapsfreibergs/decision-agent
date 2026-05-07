@@ -935,6 +935,18 @@ function on(selector, event, handler) {
 }
 
 function bindTaskComposerEvents() {
+  on("#new-task-title", "input", (el) => {
+    draftTaskTitle = el.value;
+  });
+  on("#new-task-desc", "input", (el) => {
+    draftTaskDesc = el.value;
+  });
+  on(".clarification-input", "input", (el) => {
+    const idx = parseInt(el.dataset.idx, 10);
+    if (Number.isFinite(idx)) {
+      clarificationAnswers[idx] = el.value;
+    }
+  });
   on("#task-close", "click", () => {
     taskComposerOpen = false;
     render();
@@ -1042,6 +1054,7 @@ async function load() {
 
 let loadingDashboard = false;
 async function refreshDashboard() {
+  if (taskComposerOpen) return;
   if (loadingDashboard) return;
   loadingDashboard = true;
   try {
