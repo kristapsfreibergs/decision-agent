@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>governance cockpit</title>
+    <link rel="stylesheet" href="/governance.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Decision-agent governance cockpit</h1>
+      <nav>
+        <a href="/" class="link">Workshop floor</a>
+        <a href="#runs" class="link">Runs</a>
+        <a href="#benchmarks" class="link">Benchmarks</a>
+      </nav>
+    </header>
+
+    <main id="app">
+      <section id="benchmarks-section" class="card">
+        <h2>Thesis benchmark</h2>
+        <p class="muted">
+          Launch a benchmark across condition cells and watch governance metrics extract from the audit log.
+          A&nbsp;→&nbsp;F gap proves architecture matters; F&nbsp;→&nbsp;G stability proves the architecture, not the model, enforces rules.
+        </p>
+        <form id="benchmark-form" class="form-grid">
+          <label>
+            <span>Conditions</span>
+            <div id="condition-checkboxes" class="checkbox-row"></div>
+          </label>
+          <label>
+            <span>Fixtures</span>
+            <div id="fixture-checkboxes" class="checkbox-row"></div>
+          </label>
+          <label>
+            <span>Repetitions</span>
+            <input type="number" id="reps" name="reps" value="3" min="1" max="10" />
+          </label>
+          <label>
+            <span>Per-run timeout (s)</span>
+            <input type="number" id="timeout" name="timeout" value="300" min="60" max="1800" />
+          </label>
+          <button type="submit" class="btn primary">Launch benchmark</button>
+        </form>
+        <div id="benchmark-status" class="status-line"></div>
+        <div id="benchmark-progress" class="progress-block hidden"></div>
+        <div id="benchmark-list"></div>
+      </section>
+
+      <section id="runs-section" class="card">
+        <h2>Runs</h2>
+        <p class="muted">
+          Click a run to inspect its scope, scored evidence, and authorization receipts.
+          Use the toggle panel below to create a manual run with custom layer settings.
+        </p>
+        <details class="manual-run">
+          <summary>Create a manual run with custom layer toggles</summary>
+          <form id="manual-run-form" class="form-grid">
+            <label>
+              <span>Title</span>
+              <input type="text" id="manual-title" name="title" placeholder="Procure 100 laptops" />
+            </label>
+            <label class="full">
+              <span>Description</span>
+              <textarea id="manual-description" name="description" rows="3"
+                placeholder="Budget ceiling..., compliance..., evaluate vendors..."></textarea>
+            </label>
+            <fieldset class="full">
+              <legend>Layer toggles</legend>
+              <label class="inline"><input type="checkbox" id="t-dsc"  checked />DSC</label>
+              <label class="inline"><input type="checkbox" id="t-paap" checked />PAAP</label>
+              <label class="inline"><input type="checkbox" id="t-dar"  checked />DAR</label>
+              <label class="inline"><input type="checkbox" id="t-hg"   checked />Human gate</label>
+              <label class="inline"><input type="checkbox" id="t-cv"   checked />Contract validators</label>
+            </fieldset>
+            <label>
+              <span>Provider</span>
+              <select id="provider-select">
+                <option value="">(use MODEL_PROVIDER env)</option>
+                <option value="anthropic">anthropic</option>
+                <option value="ollama/qwen2.5">ollama/qwen2.5</option>
+                <option value="ollama/llama3.1">ollama/llama3.1</option>
+                <option value="mock">mock</option>
+              </select>
+            </label>
+            <button type="submit" class="btn">Create run</button>
+          </form>
+          <div id="manual-run-status" class="status-line"></div>
+        </details>
+        <div id="run-list"></div>
+      </section>
+
+      <section id="run-detail-section" class="card hidden">
+        <h2 id="run-detail-title">Run detail</h2>
+        <div class="run-tabs">
+          <button class="tab active" data-tab="scope">Scope</button>
+          <button class="tab" data-tab="evidence">Evidence</button>
+          <button class="tab" data-tab="authorization">Authorization</button>
+          <button class="tab" data-tab="audit">Audit timeline</button>
+        </div>
+        <div id="tab-scope" class="tab-pane active"></div>
+        <div id="tab-evidence" class="tab-pane"></div>
+        <div id="tab-authorization" class="tab-pane"></div>
+        <div id="tab-audit" class="tab-pane"></div>
+      </section>
+    </main>
+
+    <script src="/governance.js"></script>
+  </body>
+</html>
