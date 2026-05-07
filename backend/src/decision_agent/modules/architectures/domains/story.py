@@ -7,6 +7,30 @@ from typing import Any
 
 DOMAIN_ID = "story"
 
+# Keywords used by the domain detector in proposal.py for provider-less fallback.
+DETECTION_KEYWORDS = ("story", "tale", "narrative", "fiction", "novel", "fable", "write a")
+
+DOMAIN_SPEC = {
+    "goal_structure": {
+        "shape": "tree",
+        "modifiers": [],
+        "reasoning": "Story tasks use a parallel intake (brief + research) feeding a sequential draft → refine → style pipeline.",
+    },
+    "topology": {
+        "shape": "tree",
+        "phases": [
+            {"id": "intake", "slot": "parallel_intake", "parallelizable": True,  "done_means": "Brief and research complete."},
+            {"id": "draft",  "slot": "write_draft",     "parallelizable": False, "done_means": "Complete story draft written."},
+            {"id": "refine", "slot": "proofread",        "parallelizable": False, "done_means": "Draft proofread and corrected."},
+            {"id": "style",  "slot": "apply_voice",      "parallelizable": False, "done_means": "Final story in human's voice written."},
+        ],
+        "dependency_model": "briefer + researcher parallel in intake; writer waits on both; proofreader and stylist sequential",
+        "completion_semantics": "done means final.md is produced",
+        "gates": [],
+        "topology_reasoning": "Story domain: parallel intake branches merge into sequential draft → refine → style.",
+    },
+}
+
 WORKER_CATALOG: list[dict[str, Any]] = [
     {
         "id": "briefer",
@@ -90,18 +114,24 @@ PHASES = [
 
 
 def build_story_decomposition(task: dict[str, Any], run_id: str) -> dict[str, Any]:
+    task_title = task.get("title") or "Unnamed story"
+    task_description = task.get("description") or ""
+    task_context = f'Task: "{task_title}". {task_description}'.strip()
+
     packages = []
     for worker in WORKER_CATALOG:
         read_paths = [p.replace("{run_id}", run_id) for p in worker["read_paths"]]
         write_paths = [p.replace("{run_id}", run_id) for p in worker["write_paths"]]
         output_fields = worker["output_fields"]
         scalar_fields = {"summary", "draft_path", "proofread_path", "final_path", "word_count"}
+        goal = f"{task_context}\n\n{worker['goal_template']}"
         packages.append({
             "id": worker["id"],
+            "worker_id": worker["id"],
             "phase_id": worker["phase"],
             "worker_role": worker["role"],
             "work_layer": worker["phase"],
-            "goal": worker["goal_template"],
+            "goal": goal,
             "read_paths": read_paths,
             "write_paths": write_paths,
             "allowed_tools": worker["allowed_tools"],

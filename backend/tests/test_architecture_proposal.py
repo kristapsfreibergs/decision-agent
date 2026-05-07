@@ -106,20 +106,23 @@ class ArchitectureProposalTest(unittest.TestCase):
     def test_approved_proposal_generates_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            run = create_run(TASK, root)
+            fallback_task = {
+                "task_id": "plain-fallback-test",
+                "title": "Reflect on speed and care",
+                "description": "One paragraph about the tradeoff.",
+            }
+            run = create_run(fallback_task, root)
             run = build_architecture_proposal(run["run_id"], root, MockProvider())
             run = approve_architecture(run["run_id"], "approved", root)
             run = generate_contracts_for_approved_architecture(run["run_id"], root)
 
             generated_dir = root / "data" / "runs" / run["run_id"] / "generated-contracts"
-            self.assertTrue((generated_dir / "ada_scope.json").exists())
-            self.assertTrue((generated_dir / "axel_review.json").exists())
-            self.assertEqual(len(run["generated_contracts"]), 2)
-            review_contract = next(
-                contract for contract in run["generated_contracts"]
-                if contract["worker_id"] == "axel_review"
-            )
-            self.assertEqual(review_contract["depends_on"], ["ada_scope"])
+            self.assertTrue((generated_dir / "plain_llm.json").exists())
+            self.assertEqual(len(run["generated_contracts"]), 1)
+            fallback_contract = run["generated_contracts"][0]
+            self.assertEqual(fallback_contract["worker_id"], "plain_llm")
+            self.assertEqual(fallback_contract["allowed_tools"], [])
+            self.assertEqual(fallback_contract["depends_on"], [])
             self.assertTrue((root / "data" / "runs" / run["run_id"] / "planning-artifact.json").exists())
             self.assertTrue(
                 any(event["event"] == "contracts_generation_completed" for event in run["audit"])

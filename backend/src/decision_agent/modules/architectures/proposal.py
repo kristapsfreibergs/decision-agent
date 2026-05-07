@@ -7,41 +7,64 @@ from pathlib import Path
 from typing import Any
 
 from decision_agent.modules.architectures.decomposers.software import decompose_software_task
-from decision_agent.modules.architectures.domains.story import build_story_decomposition
-from decision_agent.modules.architectures.domains.procurement import build_procurement_decomposition, EVIDENCE_PROFILE as PROCUREMENT_EVIDENCE_PROFILE, ACTION_GATE as PROCUREMENT_ACTION_GATE
+from decision_agent.modules.architectures.domains import story as _story_domain
+from decision_agent.modules.architectures.domains import procurement as _procurement_domain
 from decision_agent.modules.architectures.goal_structure import classify_goal_structure
 from decision_agent.modules.architectures.topology import build_topology
 from decision_agent.modules.workers.explorers import EXPLORER_CATALOG, build_explorer_package
 from decision_agent.shared.providers.base import LLMProvider
 
-_KNOWN_DOMAINS = {"story", "procurement"}
+# Domain catalog — each entry maps domain name to (spec, decomposition_fn, detection_keywords).
+# To add a new domain: create a domain module with DOMAIN_ID, DETECTION_KEYWORDS,
+# DOMAIN_SPEC, and build_*_decomposition(task, run_id). Register it here.
+# No other files need to change.
+_DOMAIN_CATALOG: dict[str, tuple[dict, Any, tuple[str, ...]]] = {
+    _story_domain.DOMAIN_ID: (
+        _story_domain.DOMAIN_SPEC,
+        _story_domain.build_story_decomposition,
+        _story_domain.DETECTION_KEYWORDS,
+    ),
+    _procurement_domain.DOMAIN_ID: (
+        _procurement_domain.DOMAIN_SPEC,
+        _procurement_domain.build_procurement_decomposition,
+        _procurement_domain.DETECTION_KEYWORDS,
+    ),
+}
 
-_DOMAIN_DETECT_SYSTEM = (
-    "You are a task domain classifier. Given a task title and description, "
-    "decide if it belongs to one of these known domains: story, procurement. "
-    "- story: write, create, draft, or generate a story, tale, narrative, fiction, or creative writing. "
-    "- procurement: buy, purchase, source, tender, vendor selection, supplier evaluation, RFP, RFQ, "
-    "  contract award, spend approval, or supply chain decision. "
-    "Respond with JSON only: {\"domain\": \"story\"} or {\"domain\": \"procurement\"} or {\"domain\": null}"
-)
+
+def _build_detect_prompt() -> str:
+    """Build the domain detection system prompt dynamically from the catalog."""
+    lines = [
+        "You are a task domain classifier. Given a task title and description, "
+        f"decide if it belongs to one of these known domains: {', '.join(_DOMAIN_CATALOG)}. "
+    ]
+    for domain_id, (spec, _, keywords) in _DOMAIN_CATALOG.items():
+        lines.append(f"- {domain_id}: {', '.join(keywords[:5])}.")
+    domain_list = " or ".join(
+        f'{{\"domain\": \"{d}\"}}' for d in _DOMAIN_CATALOG
+    )
+    lines.append(f'Respond with JSON only: {domain_list} or {{"domain": null}}')
+    return " ".join(lines)
 
 
 def _detect_domain(task: dict[str, Any], provider: LLMProvider | None) -> str | None:
+    text = f"{task.get('title', '')} {task.get('description', '')}".lower()
+    # Deterministic catalog match first. Domain catalogs are safety-critical
+    # architecture choices and should not depend on provider quality.
+    for domain_id, (_, _, keywords) in _DOMAIN_CATALOG.items():
+        if any(w in text for w in keywords):
+            return domain_id
+
     if provider is None:
-        text = f"{task.get('title', '')} {task.get('description', '')}".lower()
-        if any(w in text for w in ("story", "tale", "narrative", "fiction", "novel", "fable", "write a")):
-            return "story"
-        if any(w in text for w in ("procure", "procurement", "vendor", "supplier", "tender", "rfp", "rfq", "purchase", "sourcing", "contract award", "buy ")):
-            return "procurement"
         return None
     user = f"Task: {task.get('title', '')}\nDescription: {task.get('description', '') or 'none'}"
     try:
-        raw = provider.complete(_DOMAIN_DETECT_SYSTEM, user, max_tokens=64)
+        raw = provider.complete(_build_detect_prompt(), user, max_tokens=64)
         raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
         raw = re.sub(r"\s*```$", "", raw.strip())
         data = json.loads(raw)
         domain = data.get("domain")
-        return domain if domain in _KNOWN_DOMAINS else None
+        return domain if domain in _DOMAIN_CATALOG else None
     except Exception:
         return None
 
@@ -63,47 +86,19 @@ def build_mock_proposal(run: dict[str, Any], root: Path | None = None) -> dict[s
 
 def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvider | None = None) -> dict[str, Any]:
     task = run.get("task") or {}
-    domain = _detect_domain(task, provider)
+    domain = run.get("decision_type") if run.get("decision_type") in _DOMAIN_CATALOG else _detect_domain(task, provider)
 
-    if domain == "story":
-        goal_structure = {"shape": "tree", "modifiers": [], "reasoning": "Story tasks use a parallel intake (brief + research) feeding a sequential draft → refine → style pipeline."}
-        topology = {
-            "shape": "tree",
-            "phases": [
-                {"id": "intake", "slot": "parallel_intake", "parallelizable": True,  "done_means": "Brief and research complete."},
-                {"id": "draft",  "slot": "write_draft",     "parallelizable": False, "done_means": "Complete story draft written."},
-                {"id": "refine", "slot": "proofread",        "parallelizable": False, "done_means": "Draft proofread and corrected."},
-                {"id": "style",  "slot": "apply_voice",      "parallelizable": False, "done_means": "Final story in human's voice written."},
-            ],
-            "dependency_model": "briefer + researcher parallel in intake; writer waits on both; proofreader and stylist sequential",
-            "completion_semantics": "done means final.md is produced",
-            "gates": [],
-            "topology_reasoning": "Story domain: parallel intake branches merge into sequential draft → refine → style.",
-        }
-        decomposition = build_story_decomposition(task, run["run_id"])
-    elif domain == "procurement":
-        goal_structure = {"shape": "funnel", "modifiers": ["human_gate_required", "high_risk"], "reasoning": "Procurement decisions funnel many vendor options through elimination and scoring to a single human-approved recommendation."}
-        topology = {
-            "shape": "funnel",
-            "phases": [
-                {"id": "intake",    "slot": "parallel_intake", "parallelizable": True,  "done_means": "Requirements, market research, and risk assessment complete."},
-                {"id": "evaluate",  "slot": "evaluate_vendors", "parallelizable": False, "done_means": "Vendors eliminated, scored, and shortlisted."},
-                {"id": "recommend", "slot": "recommend",        "parallelizable": False, "done_means": "Decision brief produced and ready for human review."},
-            ],
-            "dependency_model": "intake workers run in parallel; evaluator waits on all three; recommender waits on evaluator",
-            "completion_semantics": "done means recommendation_brief.md is produced and a human has reviewed it",
-            "gates": [{"id": "human_gate", "placement": "recommend", "rule": "Human approval required before any vendor commitment or spend."}],
-            "topology_reasoning": "Procurement domain: parallel intake (requirements + market + risk) feeds evaluator, then human-gated recommender.",
-        }
-        decomposition = build_procurement_decomposition(task, run["run_id"])
+    if domain in _DOMAIN_CATALOG:
+        domain_spec, build_fn, _ = _DOMAIN_CATALOG[domain]
+        goal_structure = domain_spec["goal_structure"]
+        topology = domain_spec["topology"]
+        decomposition = build_fn(task, run["run_id"])
     else:
         goal_structure = classify_goal_structure(task, provider=provider)
         goal_structure = _apply_intake_policy(goal_structure, run, task, root)
         topology = build_topology(goal_structure)
         if run["decision_type"] == "software_project_build_task":
             decomposition = decompose_software_task(task, topology, root, goal_structure)
-        elif provider is not None:
-            decomposition = _llm_decomposition(task, topology, goal_structure, provider)
         else:
             decomposition = _generic_decomposition(task, topology, goal_structure)
 
@@ -328,7 +323,7 @@ def validate_architecture_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
         issues.append("risk_level must be low, medium, or high.")
 
     goal_structure = proposal.get("goal_structure")
-    if not isinstance(goal_structure, dict) or goal_structure.get("shape") not in {"pipeline", "search", "funnel", "debate", "checker"}:
+    if not isinstance(goal_structure, dict) or goal_structure.get("shape") not in {"pipeline", "tree", "search", "funnel", "debate", "checker"}:
         issues.append("goal_structure.shape must be a supported shape.")
 
     topology = proposal.get("topology")
@@ -434,212 +429,58 @@ def _work_layers_for_packages(packages: list[dict[str, Any]]) -> list[dict[str, 
     return list(layers.values())
 
 
-def _llm_decomposition(
-    task: dict[str, Any],
-    topology: dict[str, Any],
-    goal_structure: dict[str, Any],
-    provider: LLMProvider,
-) -> dict[str, Any]:
-    shape = goal_structure["shape"]
-    phases = topology["phases"]
-    phase_list = ", ".join(f"{p['id']} ({p['done_means']})" for p in phases)
-
-    system = (
-        "You are a task decomposition planner. "
-        "Given a task and a pre-determined execution topology, produce bounded work packages — "
-        "one per topology phase — that are specific to what the task actually requires. "
-        "Each package must have a concrete goal derived from the task content, not a generic placeholder. "
-        "Respond with a single JSON object only. No markdown, no explanation outside the JSON."
-    )
-
-    user = (
-        f"Task: {task.get('title', '')}\n"
-        f"Description: {task.get('description', '') or 'none'}\n"
-        f"Execution shape: {shape}\n"
-        f"Phases: {phase_list}\n\n"
-        "Return JSON with this exact shape:\n"
-        "{\n"
-        '  "packages": [\n'
-        "    {\n"
-        '      "id": "<phase_id>",\n'
-        '      "phase_id": "<phase_id>",\n'
-        '      "worker_role": "<role describing what this worker does for this specific task>",\n'
-        '      "work_layer": "<phase_id>",\n'
-        '      "goal": "<concrete goal for this specific task, not a generic description>",\n'
-        '      "read_paths": ["docs/**"],\n'
-        '      "write_paths": ["docs/**"],\n'
-        '      "allowed_tools": ["read_file", "write_file", "list_files"],\n'
-        '      "validators": ["write_scope"],\n'
-        '      "output_fields": ["summary", "<2-3 fields that make sense for this phase and task>"]\n'
-        "    }\n"
-        "  ],\n"
-        '  "human_questions": ["<question if task is underspecified, else empty array>"],\n'
-        '  "worker_count_reasoning": "<one sentence explaining why this many workers>"\n'
-        "}"
-    )
-
-    try:
-        raw = provider.complete(system, user, max_tokens=1024)
-        # strip markdown fences if present
-        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
-        raw = re.sub(r"\s*```$", "", raw.strip())
-        data = json.loads(raw)
-    except Exception:
-        return _generic_decomposition(task, topology, goal_structure)
-
-    packages = []
-    for item in data.get("packages", []):
-        output_fields = item.get("output_fields", ["summary", "output"])
-        packages.append({
-            "id": item.get("id", item.get("phase_id", "unknown")),
-            "phase_id": item.get("phase_id", item.get("id", "unknown")),
-            "worker_role": item.get("worker_role", f"{item.get('id', 'worker')}_worker"),
-            "work_layer": item.get("work_layer", item.get("phase_id", "generic")),
-            "goal": item.get("goal", ""),
-            "read_paths": item.get("read_paths") or ["docs/**"],
-            "write_paths": item.get("write_paths") or ["docs/**"],
-            "allowed_tools": item.get("allowed_tools") or ["read_file", "write_file", "list_files"],
-            "validators": item.get("validators") or ["write_scope"],
-            "output_schema": {
-                "type": "object",
-                "required": output_fields,
-                "properties": {f: {"type": "string" if f == "summary" else "array"} for f in output_fields},
-            },
-            "completion_contract": f"Return {', '.join(output_fields)}.",
-        })
-
-    if not packages:
-        return _generic_decomposition(task, topology, goal_structure)
-
-    dependencies: list[dict[str, Any]] = []
-    for i, pkg in enumerate(packages[1:], start=1):
-        dependencies.append({
-            "from": pkg["id"],
-            "on": packages[i - 1]["id"],
-            "reason": f"{pkg['id']} depends on output from {packages[i - 1]['id']}.",
-        })
-
-    return {
-        "domain": "generic",
-        "task_subtype": shape,
-        "affected_surfaces": [],
-        "repo_context": {},
-        "packages": packages,
-        "dependencies": dependencies,
-        "human_questions": data.get("human_questions", []),
-        "package_outline": [{"id": p["id"], "work_layer": p["work_layer"], "phase_id": p["phase_id"]} for p in packages],
-        "worker_count_reasoning": {
-            "total_workers": len(packages),
-            "reason": data.get("worker_count_reasoning", f"{shape} topology with {len(packages)} task-specific workers."),
-            "task_subtype": shape,
-            "affected_surfaces": [],
-        },
-    }
-
-
-_PHASE_GOALS: dict[str, str] = {
-    # tree
-    "plan": "Plan the structure and divide the task into independent parallel branches.",
-    "branch": "Execute this branch independently, producing a complete sub-artifact.",
-    "merge": "Merge all branch outputs into a single coherent final artifact.",
-    # pipeline
-    "scope": "Scope the task, clarify constraints, and define acceptance criteria.",
-    "assemble": "Produce the requested artifact within the bounded scope.",
-    "review": "Review the assembled result for completeness and quality.",
-    # search
-    "frame": "Frame the search space, define criteria, and set boundaries.",
-    "explore": "Explore candidate options and gather supporting evidence.",
-    "converge": "Converge on a justified result from the explored candidates.",
-    # funnel
-    "collect": "Collect candidate options for evaluation.",
-    "narrow": "Narrow options against criteria to a shortlist.",
-    "decide": "Select the recommended outcome from the shortlist.",
-    # debate
-    "position_a": "Develop the primary position with supporting reasoning.",
-    "position_b": "Develop the counter-position with supporting reasoning.",
-    "adjudicate": "Resolve competing positions and synthesise a conclusion.",
-    # checker
-    "verify": "Verify claims against collected evidence.",
-    "gate": "Apply the final review gate and record the decision.",
-}
-
-_PHASE_OUTPUT_FIELDS: dict[str, list[str]] = {
-    "plan":        ["summary", "branches", "structure"],
-    "branch":      ["summary", "output", "files_changed"],
-    "merge":       ["summary", "output", "files_changed"],
-    "scope":       ["summary", "constraints", "questions"],
-    "assemble":    ["summary", "output", "files_changed"],
-    "review":      ["summary", "issues", "verdict"],
-    "frame":       ["summary", "search_criteria", "boundaries"],
-    "explore":     ["summary", "candidates", "evidence"],
-    "converge":    ["summary", "result", "reasoning"],
-    "collect":     ["summary", "candidates"],
-    "narrow":      ["summary", "shortlist", "eliminated"],
-    "decide":      ["summary", "recommendation", "reasoning"],
-    "position_a":  ["summary", "position", "arguments"],
-    "position_b":  ["summary", "position", "arguments"],
-    "adjudicate":  ["summary", "conclusion", "reasoning"],
-    "verify":      ["summary", "findings", "verdict"],
-    "gate":        ["summary", "decision", "reasoning"],
-}
-
-_DEFAULT_OUTPUT_FIELDS = ["summary", "output"]
-
-
-def _package_for_phase(phase: dict[str, Any]) -> dict[str, Any]:
-    phase_id = phase["id"]
-    goal = _PHASE_GOALS.get(phase_id, f"Complete the {phase_id} phase of the task.")
-    output_fields = _PHASE_OUTPUT_FIELDS.get(phase_id, _DEFAULT_OUTPUT_FIELDS)
-    return {
-        "id": phase_id,
-        "phase_id": phase_id,
-        "worker_role": f"{phase_id}_worker",
-        "work_layer": phase_id,
-        "goal": goal,
-        "read_paths": ["docs/**", "README.md"],
-        "write_paths": ["docs/**"],
-        "allowed_tools": ["read_file", "write_file", "list_files"],
-        "validators": ["write_scope"],
-        "output_schema": {
-            "type": "object",
-            "required": output_fields,
-            "properties": {f: {"type": "array" if f not in ("summary", "verdict", "result", "recommendation", "decision", "conclusion") else "string"} for f in output_fields},
-        },
-        "completion_contract": f"Return {', '.join(output_fields)}.",
-    }
-
-
 def _generic_decomposition(task: dict[str, Any], topology: dict[str, Any], goal_structure: dict[str, Any]) -> dict[str, Any]:
-    packages = [_package_for_phase(phase) for phase in topology["phases"]]
-
-    dependencies: list[dict[str, Any]] = []
-    for i, package in enumerate(packages[1:], start=1):
-        dependencies.append({
-            "from": package["id"],
-            "on": packages[i - 1]["id"],
-            "reason": f"{package['id']} depends on output from {packages[i - 1]['id']}.",
-        })
-
+    task_title = task.get("title") or "Unnamed task"
+    task_description = task.get("description") or ""
+    task_context = f'Task: "{task_title}". {task_description}'.strip()
     human_questions = (
         ["What is the expected output or deliverable for this task?"]
         if "needs_clarification" in goal_structure.get("modifiers", [])
         else []
     )
-
     shape = goal_structure["shape"]
+    packages = [
+        {
+            "id": "plain_llm",
+            "worker_id": "plain_llm",
+            "phase_id": "answer",
+            "worker_role": "plain_llm",
+            "work_layer": "answer",
+            "goal": (
+                f"{task_context}\n\n"
+                "Handle this task as a single plain LLM worker. Do not assume access to external tools. "
+                "Produce the best bounded answer from the task prompt and clearly state any assumptions or gaps."
+            ),
+            "read_paths": ["docs/**", "README.md"],
+            "write_paths": ["docs/**"],
+            "allowed_tools": [],
+            "validators": ["write_scope"],
+            "output_schema": {
+                "type": "object",
+                "required": ["summary", "answer", "assumptions", "files_changed"],
+                "properties": {
+                    "summary": {"type": "string"},
+                    "answer": {"type": "string"},
+                    "assumptions": {"type": "array"},
+                    "files_changed": {"type": "array"},
+                },
+            },
+            "completion_contract": "Return summary, answer, assumptions, files_changed.",
+        }
+    ]
     return {
         "domain": "generic",
-        "task_subtype": shape,
+        "task_subtype": "plain_llm",
         "affected_surfaces": [],
         "repo_context": {},
         "packages": packages,
-        "dependencies": dependencies,
+        "dependencies": [],
         "human_questions": human_questions,
         "package_outline": [{"id": p["id"], "work_layer": p["work_layer"], "phase_id": p["phase_id"]} for p in packages],
         "worker_count_reasoning": {
-            "total_workers": len(packages),
-            "reason": f"{shape} topology derived {len(packages)} phase workers from goal structure.",
-            "task_subtype": shape,
+            "total_workers": 1,
+            "reason": f"No specific domain catalog matched; using one plain LLM fallback worker instead of a generated {shape} team.",
+            "task_subtype": "plain_llm",
             "affected_surfaces": [],
         },
     }

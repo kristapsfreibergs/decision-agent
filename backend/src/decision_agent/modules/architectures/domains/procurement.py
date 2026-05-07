@@ -14,6 +14,35 @@ from typing import Any
 
 DOMAIN_ID = "procurement"
 
+# Keywords used by the domain detector in proposal.py for provider-less fallback.
+DETECTION_KEYWORDS = ("procure", "procurement", "vendor", "supplier", "tender", "rfp", "rfq", "purchase", "sourcing", "contract award", "buy ")
+
+# Declarative domain spec — consumed by the domain registry in proposal.py.
+# Adding a new domain means creating a module with DOMAIN_SPEC + build_*_decomposition(),
+# registering it in _DOMAIN_CATALOG, and adding detection keywords. No other code changes.
+DOMAIN_SPEC = {
+    "goal_structure": {
+        "shape": "funnel",
+        "modifiers": ["human_gate_required", "high_risk"],
+        "reasoning": (
+            "Procurement decisions funnel many vendor options through elimination and "
+            "scoring to a single human-approved recommendation."
+        ),
+    },
+    "topology": {
+        "shape": "funnel",
+        "phases": [
+            {"id": "intake",    "slot": "parallel_intake",  "parallelizable": True,  "done_means": "Requirements, market research, and risk assessment complete."},
+            {"id": "evaluate",  "slot": "evaluate_vendors",  "parallelizable": False, "done_means": "Vendors eliminated, scored, and shortlisted."},
+            {"id": "recommend", "slot": "recommend",         "parallelizable": False, "done_means": "Decision brief produced and ready for human review."},
+        ],
+        "dependency_model": "intake workers run in parallel; evaluator waits on all three; recommender waits on evaluator",
+        "completion_semantics": "done means recommendation_brief.md is produced and a human has reviewed it",
+        "gates": [{"id": "human_gate", "placement": "recommend", "rule": "Human approval required before any vendor commitment or spend."}],
+        "topology_reasoning": "Procurement domain: parallel intake (requirements + market + risk) feeds evaluator, then human-gated recommender.",
+    },
+}
+
 # Evidence authority weights used by the evaluator to score and rank options.
 # Workers must declare which sources informed each claim in their output.
 EVIDENCE_PROFILE = {
@@ -218,6 +247,10 @@ PHASES = [
 
 
 def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[str, Any]:
+    task_title = task.get("title") or "Unnamed procurement"
+    task_description = task.get("description") or ""
+    task_context = f'Task: "{task_title}". {task_description}'.strip()
+
     packages = []
     for worker in WORKER_CATALOG:
         read_paths  = [p.replace("{run_id}", run_id) for p in worker["read_paths"]]
@@ -227,12 +260,14 @@ def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[s
             "summary", "procurement_subject", "overall_risk_rating",
             "recommended_vendor", "ranking_reasoning", "decision_required",
         }
+        goal = f"{task_context}\n\n{worker['goal_template']}"
         packages.append({
             "id": worker["id"],
+            "worker_id": worker["id"],
             "phase_id": worker["phase"],
             "worker_role": worker["role"],
             "work_layer": worker["phase"],
-            "goal": worker["goal_template"],
+            "goal": goal,
             "read_paths": read_paths,
             "write_paths": write_paths,
             "allowed_tools": worker["allowed_tools"],

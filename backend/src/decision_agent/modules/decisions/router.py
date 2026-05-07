@@ -16,7 +16,24 @@ BUILD_KEYWORDS = [
     "module",
 ]
 
-PURCHASE_KEYWORDS = ["buy", "purchase", "groceries", "shop", "basket", "cart"]
+PROCUREMENT_KEYWORDS = [
+    "procure",
+    "procurement",
+    "vendor",
+    "supplier",
+    "tender",
+    "rfp",
+    "rfq",
+    "purchase",
+    "sourcing",
+    "contract award",
+    "select cloud provider",
+    "select provider",
+    "evaluate vendors",
+    "evaluate aws",
+]
+
+PURCHASE_KEYWORDS = ["buy", "groceries", "shop", "basket", "cart"]
 
 
 def classify_decision_type(task: dict[str, Any]) -> dict[str, Any]:
@@ -29,6 +46,13 @@ def classify_decision_type(task: dict[str, Any]) -> dict[str, Any]:
         for value in [task.get("title"), task.get("description"), *desired_outputs]
         if value
     ).lower()
+
+    if any(keyword in text for keyword in PROCUREMENT_KEYWORDS):
+        return {
+            "decision_type": "procurement",
+            "confidence": 0.78,
+            "reason": "Task asks to select, evaluate, or source a vendor or supplier.",
+        }
 
     if any(keyword in text for keyword in BUILD_KEYWORDS):
         return {
