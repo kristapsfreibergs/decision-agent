@@ -1,0 +1,4 @@
+{
+  "title": "Select cloud provider for backend infrastructure",
+  "description": "We need to select a cloud provider for our decision-agent backend. Budget ceiling: EUR 50,000/year. Must be GDPR compliant (EU data residency required). Required services: managed Kubernetes, managed PostgreSQL, object storage. Evaluate AWS, Azure, GCP, and Hetzner. Delivery timeline: contract signed within 60 days. Compliance requirement: ISO 27001 certification mandatory."
+}
