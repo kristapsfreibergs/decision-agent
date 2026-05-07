@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from decision_agent.modules.runs.state import (
+    ACTION_PROPOSED,
+    AUTHORIZATION_RECEIPT_RECORDED,
+    EVIDENCE_SCORED,
     VALIDATION_FAILED,
     VALIDATION_PASSED,
     WORKER_MESSAGE,
@@ -13,6 +16,13 @@ from decision_agent.modules.runs.state import (
     WORKER_SUBMITTED,
 )
 from decision_agent.modules.contracts.output_validator import validate_contractual_output
+from decision_agent.modules.governance.dar import (
+    build_proposal_from_output,
+    evaluate_action,
+    persist_receipt,
+)
+from decision_agent.modules.governance.layer_config import LayerConfig
+from decision_agent.modules.governance.paap import evaluate_paap
 from decision_agent.modules.workers.tools import TOOL_DEFINITIONS, execute_tool
 from decision_agent.shared.audit_log import append_audit_event
 from decision_agent.shared.providers.base import LLMProvider
@@ -26,6 +36,35 @@ SKIP_SUFFIXES = {".pyc", ".pyo", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf
 def _build_system_prompt(contract: dict[str, Any]) -> str:
     output_schema = json.dumps(contract.get("output_schema", {}), indent=2)
     validators = ", ".join(contract.get("validators", []))
+    cfg = LayerConfig.from_dict(contract.get("layer_config"))
+
+    paap_block = ""
+    if cfg.paap_enabled and "evidence_sources_declared" in (contract.get("validators") or []):
+        evidence_profile = contract.get("evidence_profile") or {}
+        weights = evidence_profile.get("authority_weights") or {}
+        allowed = sorted(t for t, w in weights.items() if float(w) > 0.0)
+        paap_block = (
+            "\n\nEVIDENCE CITATION RULES (PAAP):\n"
+            "- The evidence_sources field must be a JSON array of objects.\n"
+            "- Each object has: id (string), type (string), excerpt (short string), "
+            "created_at (ISO date or null).\n"
+            f"- type must be one of: {', '.join(allowed) if allowed else '<see contract>'}\n"
+            "- Do NOT cite model_inference. Do NOT make up sources.\n"
+            "- Every claim in your output must be traceable to one of the evidence_sources entries.\n"
+        )
+
+    scope_block = ""
+    if cfg.dsc_enabled and contract.get("scope_contract"):
+        scope = contract["scope_contract"]
+        markers = scope.get("out_of_scope_markers", [])
+        phrases = scope.get("scope_phrase_blocklist", [])
+        scope_block = (
+            "\n\nSCOPE RULES (DSC):\n"
+            f"- Out-of-scope markers (must NOT appear in output): {', '.join(markers) or 'none'}\n"
+            f"- Forbidden phrases (must NOT appear, case-insensitive): {', '.join(phrases) or 'none'}\n"
+            "- Stay strictly inside the decision scope. State 'unknown' rather than speculating.\n"
+        )
+
     return f"""You are a bounded worker agent operating under a strict contract.
 
 Worker ID: {contract["worker_id"]}
@@ -54,7 +93,7 @@ OUTPUT RULES (strictly enforced):
 - Start your response with {{ and end with }}.
 - No preamble, no explanation, no markdown, no code fences.
 - Schema you must match:
-{output_schema}"""
+{output_schema}{paap_block}{scope_block}"""
 
 
 def _build_user_prompt(contract: dict[str, Any], context_files: dict[str, str]) -> str:
@@ -199,11 +238,17 @@ def _write_worker_output(
 
 
 def _minimum_tool_requirement_met(called_tools: list[str], allowed_tools: list[str]) -> bool:
-    if "write_file" in allowed_tools:
-        return "write_file" in called_tools
-    if any(tool in allowed_tools for tool in ("read_file", "list_files", "run_tests")):
-        return bool(called_tools)
-    return True
+    """Worker must use at least one tool before submitting a final JSON.
+
+    Earlier this required write_file specifically — too strict for analysis
+    workers (procurement intake, evaluator) whose primary artifact is the
+    structured JSON output, not a markdown file. Now we only require *some*
+    tool was called, leaving "did the file actually get written" to the
+    write_scope validator (which checks files_changed against write_paths).
+    """
+    if not any(tool in allowed_tools for tool in ("read_file", "write_file", "list_files", "run_tests")):
+        return True
+    return bool(called_tools)
 
 
 def run_worker(
@@ -245,8 +290,9 @@ def run_worker(
     max_steps = contract.get("max_steps", 6)
     raw_response = ""
     called_tools: list[str] = []
+    json_nudge_count = 0
 
-    for _ in range(max_steps):
+    for step in range(max_steps):
         # Only force tool use on the very first turn (no tools called yet, no prior tool results).
         # After a tool_result message, Anthropic rejects tool_choice:"any" paired with the result.
         first_turn = len(called_tools) == 0 and len(messages) == 1
@@ -302,6 +348,28 @@ def run_worker(
 
         raw_response = str(response["content"])
         emit(WORKER_MESSAGE, role="agent", text=raw_response[:500])  # truncate for audit
+
+        # Recovery: if the model emitted a transition message ("Let me write the
+        # JSON now…") with no actual JSON object and we have steps remaining,
+        # nudge it once to produce the JSON. Common Sonnet failure mode on
+        # complex output schemas.
+        if "{" not in raw_response and json_nudge_count < 2 and step < max_steps - 1:
+            json_nudge_count += 1
+            messages.append({"role": "assistant", "content": raw_response})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Finish the worker contract now. "
+                        "If you still need to write the markdown artifact and write_file is available, "
+                        "call write_file first. Then produce ONLY the final JSON object matching the schema. "
+                        "Begin your response with { and end with }. "
+                        "No preamble, no markdown fences, no commentary. "
+                        "Just the raw JSON."
+                    ),
+                }
+            )
+            continue
         break
 
     if not raw_response:
@@ -323,7 +391,20 @@ def run_worker(
         raise ValueError(f"Worker {worker_id} output failed schema validation: {'; '.join(issues)}")
 
     # Run contractual output validators (evidence_sources_declared, write_scope, etc.)
-    contract_issues = validate_contractual_output(output, contract)
+    # project_root lets PAAP persist scored evidence records under
+    # data/runs/{run_id}/evidence/{worker_id}.json.
+    contract_issues = validate_contractual_output(output, contract, project_root=project_root)
+    cfg = LayerConfig.from_dict(contract.get("layer_config"))
+    if cfg.paap_enabled and "evidence_sources_declared" in (contract.get("validators") or []):
+        _, record = evaluate_paap(output, contract, project_root=None)
+        if record.sources:
+            emit(
+                EVIDENCE_SCORED,
+                source_count=len(record.sources),
+                record_score=round(record.score, 4),
+                threshold=record.profile_thresholds.get("min_avg_score"),
+                passed=record.score >= record.profile_thresholds.get("min_avg_score", 0.0),
+            )
     if contract_issues:
         emit(VALIDATION_FAILED, reason="; ".join(contract_issues))
         raise ValueError(f"Worker {worker_id} failed contractual validation: {'; '.join(contract_issues)}")
@@ -336,5 +417,28 @@ def run_worker(
         files_changed=output.get("files_changed", []),
         output_file=output_file,
     )
+
+    # DAR: build authorization receipt for workers that declare a dar_action_type.
+    # Receipt is deterministic given (consequence_class, evidence_floor_met, layer_config).
+    if cfg.dar_enabled and contract.get("dar_action_type"):
+        proposal = build_proposal_from_output(output, contract)
+        if proposal is not None:
+            emit(
+                ACTION_PROPOSED,
+                action_type=proposal.action_type,
+                target=proposal.target,
+                evidence_count=len(proposal.claimed_evidence_ids),
+            )
+            receipt = evaluate_action(proposal, contract, project_root)
+            persist_receipt(receipt, run_id, project_root / "data" / "runs")
+            emit(
+                AUTHORIZATION_RECEIPT_RECORDED,
+                receipt_id=receipt.receipt_id,
+                consequence_class=receipt.consequence_class,
+                decision=receipt.decision,
+                rule_fired=receipt.rule_fired,
+                evidence_floor_met=receipt.evidence_floor_met,
+                evidence_score=receipt.evidence_score,
+            )
 
     return output

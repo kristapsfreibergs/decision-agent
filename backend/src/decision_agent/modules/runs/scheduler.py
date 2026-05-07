@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from decision_agent.modules.governance.layer_config import LayerConfig
 from decision_agent.modules.runs.state import (
     AGENT_STATUS_ASSIGNED,
     AGENT_STATUS_FAILED,
@@ -16,11 +17,18 @@ TERMINAL_STATUSES = {AGENT_STATUS_VALIDATED, AGENT_STATUS_REJECTED, AGENT_STATUS
 
 
 def is_phase_gate_cleared(run: dict[str, Any], phase_id: str | None, gates: list[dict[str, Any]]) -> bool:
-    """Return True if there is no gate for this phase, or if the gate has been approved."""
+    """Return True if there is no gate for this phase, or if the gate has been approved.
+
+    Phase gates are part of the human_gate governance layer. When that layer
+    is disabled (condition A baseline) the gate does not apply.
+    """
     if not phase_id:
         return True
     phase_gate = next((g for g in gates if g.get("placement") == phase_id), None)
     if phase_gate is None:
+        return True
+    cfg = LayerConfig.from_dict(run.get("layer_config"))
+    if not cfg.human_gate_enabled:
         return True
     return any(
         e.get("event") == PHASE_GATE_APPROVED and e.get("phase_id") == phase_id

@@ -12,6 +12,13 @@ import re
 
 from decision_agent.modules.architectures.registry import list_architectures
 from decision_agent.modules.decisions.suggestions import suggest_task_setup, suggest_task_setup_with_answers
+from decision_agent.modules.evaluation.runner import (
+    CONDITION_MAP,
+    get_benchmark,
+    list_benchmarks,
+    list_fixtures,
+    run_benchmark,
+)
 from decision_agent.modules.runs.service import (
     answer_worker,
     approve_architecture,
@@ -172,6 +179,61 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
                 }
             )
             return
+        if parsed.path == "/api/benchmarks":
+            self._send_json(
+                {
+                    "fixtures": list_fixtures(),
+                    "conditions": list(CONDITION_MAP.keys()),
+                    "benchmarks": list_benchmarks(ROOT),
+                }
+            )
+            return
+        m = re.fullmatch(r"/api/benchmarks/([^/]+)", parsed.path)
+        if m:
+            benchmark_id = m.group(1)
+            state = get_benchmark(benchmark_id)
+            if state is None:
+                # try disk
+                progress = ROOT / "data" / "benchmarks" / benchmark_id / "progress.json"
+                if progress.exists():
+                    state = json.loads(progress.read_text(encoding="utf-8"))
+            if state is None:
+                self.send_error(HTTPStatus.NOT_FOUND, "Benchmark not found")
+                return
+            self._send_json(state)
+            return
+        m = re.fullmatch(r"/api/runs/([^/]+)/scope", parsed.path)
+        if m:
+            run = read_run(m.group(1), ROOT)
+            if not run:
+                self.send_error(HTTPStatus.NOT_FOUND, "Run not found")
+                return
+            self._send_json(run.get("scope") or {})
+            return
+        m = re.fullmatch(r"/api/runs/([^/]+)/evidence", parsed.path)
+        if m:
+            run = read_run(m.group(1), ROOT)
+            if not run:
+                self.send_error(HTTPStatus.NOT_FOUND, "Run not found")
+                return
+            self._send_json(run.get("evidence") or {})
+            return
+        m = re.fullmatch(r"/api/runs/([^/]+)/authorization", parsed.path)
+        if m:
+            run = read_run(m.group(1), ROOT)
+            if not run:
+                self.send_error(HTTPStatus.NOT_FOUND, "Run not found")
+                return
+            self._send_json({"receipts": run.get("authorization") or []})
+            return
+        m = re.fullmatch(r"/api/runs/([^/]+)", parsed.path)
+        if m:
+            run = read_run(m.group(1), ROOT)
+            if not run:
+                self.send_error(HTTPStatus.NOT_FOUND, "Run not found")
+                return
+            self._send_json(run)
+            return
         if self._static_path(self.path) is None:
             self.send_error(HTTPStatus.FORBIDDEN, "Forbidden")
             return
@@ -186,6 +248,27 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # POST /api/benchmarks
+        if path == "/api/benchmarks":
+            try:
+                body = self._read_body()
+                conditions = body.get("conditions") or list(CONDITION_MAP.keys())
+                fixtures = body.get("fixtures") or list_fixtures()
+                reps = int(body.get("reps", 3))
+                timeout = float(body.get("timeout_seconds", 300))
+                unknown = [c for c in conditions if c not in CONDITION_MAP]
+                if unknown:
+                    raise ValueError(f"Unknown conditions: {unknown}")
+                benchmark_id = run_benchmark(conditions, fixtures, reps, ROOT, timeout)
+            except Exception as error:
+                self._send_json(
+                    {"error": {"code": "benchmark_failed", "message": str(error)}},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            self._send_json({"benchmark_id": benchmark_id, "status": "started"}, status=HTTPStatus.CREATED)
+            return
 
         # POST /api/runs
         if path == "/api/task-suggestions":
@@ -220,8 +303,25 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
         # POST /api/runs
         if path == "/api/runs":
             try:
-                task = self._read_body()
-                run = create_run(task, ROOT)
+                body = self._read_body()
+                # Body may be either a bare task or {task, layer_config, provider_override}
+                if "task" in body and isinstance(body.get("task"), dict):
+                    task = body["task"]
+                    layer_config = body.get("layer_config")
+                    provider_override = body.get("provider_override")
+                    benchmark_mode = bool(body.get("benchmark_mode", False))
+                else:
+                    task = body
+                    layer_config = None
+                    provider_override = None
+                    benchmark_mode = False
+                run = create_run(
+                    task,
+                    ROOT,
+                    layer_config=layer_config,
+                    provider_override=provider_override,
+                    benchmark_mode=benchmark_mode,
+                )
             except Exception as error:
                 self._send_json(
                     {"error": {"code": "run_create_failed", "message": str(error)}},
@@ -312,7 +412,7 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
                         self._send_json({"run_id": run_id, "status": "already_scheduled"})
                         return
                     _ACTIVE_SCHEDULERS.add(run_id)
-                provider = get_provider()
+                provider = get_provider(run.get("provider_override"))
                 threading.Thread(
                     target=_run_scheduler,
                     args=(run_id, ROOT, provider),
@@ -398,7 +498,7 @@ class DecisionAgentHandler(SimpleHTTPRequestHandler):
                     )
                     return
                 audit_path = ROOT / "data" / "runs" / run_id / "audit.jsonl"
-                provider = get_provider()
+                provider = get_provider(run.get("provider_override"))
                 thread = threading.Thread(
                     target=_execute_in_background,
                     args=(run_id, worker_id, contract, audit_path, ROOT, provider),

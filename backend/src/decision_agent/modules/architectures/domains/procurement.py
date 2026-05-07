@@ -69,6 +69,53 @@ EVIDENCE_PROFILE = {
         "Budget ceiling is a hard cap, not a negotiating target. Options above budget are eliminated before scoring.",
         "Model inference may not be cited as a source in evaluator output. All claims must trace to a declared source with authority weight > 0.",
     ],
+    # PAAP scoring thresholds. A worker that declares evidence must produce
+    # a record_score >= min_avg_score and every individual source_score
+    # >= min_individual_score, or the validator rejects the output.
+    "min_avg_score": 0.6,
+    "min_individual_score": 0.4,
+    "temporal_half_life_days": 365,
+}
+
+# Decision scope profile (DSC). Defines what evidence types are allowed/required
+# for a procurement decision and which textual markers are forbidden in worker output.
+# allowed_evidence_classes is derived from EVIDENCE_PROFILE.authority_weights at module
+# load: every type with weight > 0 is allowed; weight == 0 (model_inference) is excluded.
+SCOPE_PROFILE = {
+    "allowed_evidence_classes": [
+        name for name, weight in EVIDENCE_PROFILE["authority_weights"].items()
+        if float(weight) > 0.0
+    ],
+    "required_evidence_classes": [
+        "compliance_rule",
+        "vendor_proposal",
+    ],
+    "out_of_scope_markers": [
+        "personal_opinion",
+        "competitor_smear",
+        "rumor",
+    ],
+    "scope_phrase_blocklist": [
+        "i think",
+        "in my opinion",
+        "i feel that",
+        "my gut says",
+        "i suspect",
+        "rumor has it",
+    ],
+}
+
+# Mapping from worker action types to consequence class. Consumed by DAR
+# to produce deterministic ALLOW/DENY/ESCALATE receipts on the recommend phase.
+CONSEQUENCE_TABLE = {
+    "produce_brief":           "INTERNAL_REVERSIBLE",
+    "score_vendors":           "INTERNAL_REVERSIBLE",
+    "shortlist_vendors":       "INTERNAL_REVERSIBLE",
+    "publish_recommendation":  "EXTERNAL_VISIBLE",
+    "notify_vendor":           "EXTERNAL_VISIBLE",
+    "select_vendor":           "IRREVERSIBLE",
+    "commit_spend":            "IRREVERSIBLE",
+    "award_contract":          "IRREVERSIBLE",
 }
 
 # Action gate: procurement decisions are always escalated to a human.
@@ -171,6 +218,7 @@ WORKER_CATALOG: list[dict[str, Any]] = [
         "phase": "evaluate",
         "parallelizable": False,
         "role": "evaluator",
+        "dar_action_type": "score_vendors",
         "goal_template": (
             "Evaluate and score candidate vendors or options against the requirements. "
             "Step 1 — elimination: remove any vendor that fails a compliance requirement "
@@ -204,6 +252,7 @@ WORKER_CATALOG: list[dict[str, Any]] = [
         "phase": "recommend",
         "parallelizable": False,
         "role": "recommender",
+        "dar_action_type": "publish_recommendation",
         "goal_template": (
             "Produce the final procurement recommendation brief for human review. "
             "The brief must include: recommended vendor(s) from the shortlist with ranked reasoning, "
@@ -261,6 +310,12 @@ def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[s
             "recommended_vendor", "ranking_reasoning", "decision_required",
         }
         goal = f"{task_context}\n\n{worker['goal_template']}"
+        action_type = worker.get("dar_action_type")
+        consequence_class = CONSEQUENCE_TABLE.get(action_type) if action_type else None
+        # Procurement workers do multiple reads + structured analysis + final
+        # JSON output. Complex evaluator/recommender workers need extra turns
+        # for reads, optional artifact writes, and final JSON recovery nudges.
+        max_steps = 16 if worker["phase"] in {"evaluate", "recommend"} else 10
         packages.append({
             "id": worker["id"],
             "worker_id": worker["id"],
@@ -272,6 +327,9 @@ def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[s
             "write_paths": write_paths,
             "allowed_tools": worker["allowed_tools"],
             "validators": worker["validators"],
+            "max_steps": max_steps,
+            "dar_action_type": action_type,
+            "dar_consequence_class": consequence_class,
             "output_schema": {
                 "type": "object",
                 "required": output_fields,
@@ -292,6 +350,8 @@ def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[s
         "dependencies": DEPENDENCIES,
         "human_questions": [],
         "evidence_profile": EVIDENCE_PROFILE,
+        "scope_profile": SCOPE_PROFILE,
+        "consequence_table": CONSEQUENCE_TABLE,
         "action_gate": ACTION_GATE,
         "package_outline": [
             {"id": p["id"], "work_layer": p["work_layer"], "phase_id": p["phase_id"]}

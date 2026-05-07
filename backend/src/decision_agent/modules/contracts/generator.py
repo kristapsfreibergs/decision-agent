@@ -5,12 +5,15 @@ from typing import Any
 from uuid import uuid4
 
 from decision_agent.modules.contracts.validator import validate_worker_contract
+from decision_agent.modules.governance.layer_config import LayerConfig
 
 
 def instantiate_generated_contract(
     worker: dict[str, Any],
     proposal: dict[str, Any],
     run: dict[str, Any],
+    layer_config: LayerConfig | None = None,
+    scope_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     run_id = run["run_id"]
     package_to_worker = {
@@ -38,6 +41,11 @@ def instantiate_generated_contract(
     raw_read_paths = _fix_paths(deepcopy(worker["read_paths"]))
     read_paths = raw_read_paths + [p for p in dep_output_paths if p not in raw_read_paths]
 
+    cfg = layer_config or LayerConfig.full()
+    validators = deepcopy(worker["validators"])
+    if cfg.dsc_enabled and scope_contract and "dsc_scope" not in validators:
+        validators.append("dsc_scope")
+
     return {
         "worker_id": worker["worker_id"],
         "work_package_id": worker.get("work_package_id"),
@@ -62,8 +70,12 @@ def instantiate_generated_contract(
         "allowed_tools": deepcopy(worker["allowed_tools"]),
         "max_steps": worker["max_steps"],
         "output_schema": deepcopy(worker["output_schema"]),
-        "validators": deepcopy(worker["validators"]),
+        "validators": validators,
         "evidence_profile": deepcopy(proposal.get("evidence_profile") or {}),
+        "scope_contract": deepcopy(scope_contract) if scope_contract else None,
+        "layer_config": cfg.to_dict(),
+        "dar_action_type": worker.get("dar_action_type"),
+        "dar_consequence_class": worker.get("dar_consequence_class"),
         "completion_contract": worker["completion_contract"],
         "generated_from": "architecture-proposal.json",
     }
@@ -72,9 +84,11 @@ def instantiate_generated_contract(
 def generate_contracts_from_proposal(
     proposal: dict[str, Any],
     run: dict[str, Any],
+    layer_config: LayerConfig | None = None,
+    scope_contract: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     contracts = [
-        instantiate_generated_contract(worker, proposal, run)
+        instantiate_generated_contract(worker, proposal, run, layer_config, scope_contract)
         for worker in proposal.get("workers", [])
     ]
 

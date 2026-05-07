@@ -21,6 +21,11 @@ from decision_agent.modules.contracts.validator import (
     validate_worker_contract,
 )
 from decision_agent.modules.decisions.router import classify_decision_type
+from decision_agent.modules.governance.dsc import (
+    derive_scope_contract,
+    persist_scope_contract,
+)
+from decision_agent.modules.governance.layer_config import LayerConfig
 from decision_agent.modules.runs.state import (
     ARCHITECTURE_APPROVED,
     ARCHITECTURE_BUILD_STARTED,
@@ -38,6 +43,7 @@ from decision_agent.modules.runs.state import (
     PLANNING_ARTIFACT_APPROVED,
     PLANNING_ARTIFACT_CREATED,
     PLANNING_ARTIFACT_REJECTED,
+    SCOPE_BOUND,
     TOPOLOGY_BUILT,
     enrich_run,
 )
@@ -81,6 +87,45 @@ def _read_architecture_proposal(run_dir: Path) -> dict[str, Any] | None:
 
 def _read_planning_artifact(run_dir: Path) -> dict[str, Any] | None:
     return _read_json(run_dir / "planning-artifact.json")
+
+
+def _read_scope(run_dir: Path) -> dict[str, Any] | None:
+    return _read_json(run_dir / "scope.json")
+
+
+def _read_evidence(run_dir: Path) -> dict[str, Any]:
+    evidence_dir = run_dir / "evidence"
+    if not evidence_dir.exists():
+        return {}
+    records: dict[str, Any] = {}
+    for record_file in sorted(evidence_dir.glob("*.json")):
+        record = _read_json(record_file)
+        if record is not None:
+            records[record_file.stem] = record
+    return records
+
+
+def _read_authorization(run_dir: Path) -> list[dict[str, Any]]:
+    auth_dir = run_dir / "authorization"
+    if not auth_dir.exists():
+        return []
+    receipts: list[dict[str, Any]] = []
+    for receipt_file in sorted(auth_dir.glob("*.json")):
+        receipt = _read_json(receipt_file)
+        if receipt is not None:
+            receipts.append(receipt)
+    return receipts
+
+
+def _scope_profile_for_decision(decision_type: str) -> tuple[dict[str, Any] | None, str]:
+    """Return (scope_profile, domain) for a known decision type, or (None, 'generic')."""
+    try:
+        from decision_agent.modules.architectures.domains import procurement as _proc
+        if decision_type == _proc.DOMAIN_ID:
+            return (_proc.SCOPE_PROFILE, _proc.DOMAIN_ID)
+    except Exception:
+        pass
+    return (None, "generic")
 
 
 _RUN_PATH_RE = re.compile(r"^(data/runs/)[^/]+(/.+)$")
@@ -149,9 +194,22 @@ def instantiate_worker_contract(
     }
 
 
-def create_run(task: dict[str, Any], root: Path) -> dict[str, Any]:
+def create_run(
+    task: dict[str, Any],
+    root: Path,
+    layer_config: LayerConfig | dict[str, Any] | None = None,
+    provider_override: str | None = None,
+    benchmark_mode: bool = False,
+) -> dict[str, Any]:
     decision = classify_decision_type(task)
     architecture = find_architecture_for_decision(decision["decision_type"])
+
+    if isinstance(layer_config, dict):
+        cfg = LayerConfig.from_dict(layer_config)
+    elif isinstance(layer_config, LayerConfig):
+        cfg = layer_config
+    else:
+        cfg = LayerConfig.full()
 
     run_id = _run_id()
     run_dir = root / "data" / "runs" / run_id
@@ -178,8 +236,29 @@ def create_run(task: dict[str, Any], root: Path) -> dict[str, Any]:
             "decision_type": decision["decision_type"],
             "architecture_id": architecture["id"] if architecture else "dynamic",
             "task_title": task.get("title"),
+            "layer_config": cfg.to_dict(),
+            "provider_override": provider_override,
+            "benchmark_mode": bool(benchmark_mode),
         },
     )
+
+    # DSC: derive and persist scope contract for known domains when enabled.
+    scope_profile, domain = _scope_profile_for_decision(decision["decision_type"])
+    scope_contract_dict: dict[str, Any] | None = None
+    if cfg.dsc_enabled and scope_profile:
+        scope = derive_scope_contract(run_id, domain, scope_profile)
+        persist_scope_contract(scope, root / "data" / "runs")
+        scope_contract_dict = scope.to_dict()
+        append_audit_event(
+            audit_path,
+            {
+                "event": SCOPE_BOUND,
+                "run_id": run_id,
+                "domain": domain,
+                "allowed_evidence_classes": list(scope.allowed_evidence_classes),
+                "required_evidence_classes": list(scope.required_evidence_classes),
+            },
+        )
 
     contracts: list[dict[str, Any]] = []
     if not is_dynamic:
@@ -188,6 +267,11 @@ def create_run(task: dict[str, Any], root: Path) -> dict[str, Any]:
             for worker in architecture["workers"]
         ]
         for contract in contracts:
+            if scope_contract_dict:
+                contract["scope_contract"] = deepcopy(scope_contract_dict)
+                if cfg.dsc_enabled and "dsc_scope" not in contract.get("validators", []):
+                    contract.setdefault("validators", []).append("dsc_scope")
+            contract["layer_config"] = cfg.to_dict()
             result = validate_worker_contract(contract)
             if not result["valid"]:
                 joined = "; ".join(result["issues"])
@@ -215,6 +299,9 @@ def create_run(task: dict[str, Any], root: Path) -> dict[str, Any]:
         "risk_level": architecture["risk_level"] if architecture else "medium",
         "action_gate": deepcopy(architecture["action_gate"]) if architecture else {"type": "human_gate", "requires_human_review": True, "automatic_final_action": False},
         "outcome_metrics": deepcopy(architecture["outcome_metrics"]) if architecture else ["planning_artifact_created", "architecture_approved", "contracts_generated"],
+        "layer_config": cfg.to_dict(),
+        "provider_override": provider_override,
+        "benchmark_mode": bool(benchmark_mode),
         "contracts": [
             {
                 "worker_id": contract["worker_id"],
@@ -254,6 +341,9 @@ def _load_run(run_dir: Path) -> dict[str, Any] | None:
             "outputs": _read_outputs(run_dir),
             "architecture_proposal": _read_architecture_proposal(run_dir),
             "planning_artifact": _read_planning_artifact(run_dir),
+            "scope": _read_scope(run_dir),
+            "evidence": _read_evidence(run_dir),
+            "authorization": _read_authorization(run_dir),
             "run_dir": str(run_dir),
         }
     )
@@ -339,6 +429,17 @@ def gate_approve(run_id: str, note: str, root: Path) -> dict[str, Any]:
     run = _load_run(run_dir)
     if not run:
         raise ValueError(f"Run not found: {run_id}")
+    cfg = LayerConfig.from_dict(run.get("layer_config"))
+    if cfg.dar_enabled:
+        receipts = run.get("authorization") or []
+        ok = any(
+            r.get("decision") in {"ALLOW", "ESCALATE"} for r in receipts
+        )
+        if not ok:
+            raise ValueError(
+                "DAR: gate_approve requires an authorization receipt with decision "
+                "ALLOW or ESCALATE. None found."
+            )
     audit_path = run_dir / "audit.jsonl"
     append_audit_event(
         audit_path,
@@ -534,7 +635,33 @@ def generate_contracts_for_approved_architecture(run_id: str, root: Path) -> dic
         },
     )
 
-    contracts, issues = generate_contracts_from_proposal(proposal, run)
+    # DSC: derive scope from the proposal's scope_profile (or domain default) and
+    # persist it before contract generation so the generator can embed it.
+    cfg = LayerConfig.from_dict(run.get("layer_config"))
+    scope_profile = proposal.get("scope_profile")
+    if not scope_profile:
+        scope_profile, _ = _scope_profile_for_decision(run.get("decision_type", ""))
+    domain = (proposal.get("domain_context") or {}).get("domain") or "generic"
+    scope_contract_dict: dict[str, Any] | None = None
+    if cfg.dsc_enabled and scope_profile:
+        if not run.get("scope"):
+            scope = derive_scope_contract(run_id, domain, scope_profile)
+            persist_scope_contract(scope, root / "data" / "runs")
+            append_audit_event(
+                audit_path,
+                {
+                    "event": SCOPE_BOUND,
+                    "run_id": run_id,
+                    "domain": domain,
+                    "allowed_evidence_classes": list(scope.allowed_evidence_classes),
+                    "required_evidence_classes": list(scope.required_evidence_classes),
+                },
+            )
+            scope_contract_dict = scope.to_dict()
+        else:
+            scope_contract_dict = run["scope"]
+
+    contracts, issues = generate_contracts_from_proposal(proposal, run, cfg, scope_contract_dict)
     if issues:
         append_audit_event(
             audit_path,

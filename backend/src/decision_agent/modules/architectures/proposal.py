@@ -132,6 +132,8 @@ def build_planning_artifact(run: dict[str, Any], root: Path, provider: LLMProvid
         "human_questions": decomposition.get("human_questions", []),
         "approval_status": "pending",
         "evidence_profile": decomposition.get("evidence_profile"),
+        "scope_profile": decomposition.get("scope_profile"),
+        "consequence_table": decomposition.get("consequence_table"),
         "action_gate": decomposition.get("action_gate"),
         "domain_context": {
             "domain": decomposition.get("domain", "generic"),
@@ -256,10 +258,12 @@ def artifact_to_proposal(artifact: dict[str, Any], run: dict[str, Any]) -> dict[
                 "read_paths": deepcopy(package["read_paths"]),
                 "write_paths": deepcopy(package["write_paths"]),
                 "allowed_tools": deepcopy(package["allowed_tools"]),
-                "max_steps": 6,
+                "max_steps": package.get("max_steps", 6),
                 "validators": deepcopy(package["validators"]),
                 "output_schema": deepcopy(package["output_schema"]),
                 "completion_contract": package["completion_contract"],
+                "dar_action_type": package.get("dar_action_type"),
+                "dar_consequence_class": package.get("dar_consequence_class"),
             }
         )
 
@@ -278,6 +282,8 @@ def artifact_to_proposal(artifact: dict[str, Any], run: dict[str, Any]) -> dict[
             "authority_weights": {"repository_structure": 0.95, "local_docs": 0.9, "task_request": 0.85},
             "conflict_rules": ["Bounded scope and validators override model preference."],
         },
+        "scope_profile": artifact.get("scope_profile"),
+        "consequence_table": artifact.get("consequence_table"),
         "work_layers": _work_layers_for_packages(artifact["packages"]),
         "workers": workers,
         "dependencies": deepcopy(artifact["dependencies"]),

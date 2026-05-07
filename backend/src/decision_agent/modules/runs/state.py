@@ -60,6 +60,12 @@ CONTRACTS_GENERATION_COMPLETED = "contracts_generation_completed"
 CONTRACTS_GENERATION_FAILED = "contracts_generation_failed"
 CONTRACTS_GENERATED = "contracts_generated"
 
+# governance events (DSC, PAAP, DAR)
+SCOPE_BOUND = "scope_bound"
+EVIDENCE_SCORED = "evidence_scored"
+ACTION_PROPOSED = "action_proposed"
+AUTHORIZATION_RECEIPT_RECORDED = "authorization_receipt_recorded"
+
 # ---------------------------------------------------------------------------
 # Run statuses (derived)
 # ---------------------------------------------------------------------------
