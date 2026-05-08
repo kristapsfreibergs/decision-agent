@@ -8,7 +8,7 @@ class LLMProvider(ABC):
     """Minimal interface all providers must implement."""
 
     @abstractmethod
-    def complete(self, system: str, user: str, *, max_tokens: int = 4096) -> str:
+    def complete(self, system: str, user: str, *, max_tokens: int = 16000) -> str:
         """Return the assistant text response for a single turn."""
         ...
 
@@ -18,7 +18,7 @@ class LLMProvider(ABC):
         messages: list[dict],
         tools: list[dict],
         *,
-        max_tokens: int = 4096,
+        max_tokens: int = 16000,
         tool_choice: dict | None = None,
     ) -> dict:
         """

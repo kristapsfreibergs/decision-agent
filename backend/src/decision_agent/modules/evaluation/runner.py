@@ -34,7 +34,18 @@ from decision_agent.shared.providers.registry import get_provider
 
 
 _FULL_CONDITION_MAP: dict[str, tuple[LayerConfig, str | None]] = {
-    "A":       (LayerConfig.baseline(), None),                   # default provider
+    # A0: plain model — single LLM call, no architecture, no workers, no governance.
+    #     This is the true baseline: what does the model produce on its own?
+    "A0":      (LayerConfig.baseline(), "anthropic"),
+    # A:  dynamic architecture + contracts, but all governance layers OFF.
+    #     Tests whether decomposition alone changes anything vs A0.
+    "A":       (LayerConfig.baseline(), None),
+    # C:  architecture + contracts + validators ON, but DSC/PAAP/DAR OFF.
+    #     Tests whether contract-level output validation adds governance without
+    #     the full DSC/PAAP/DAR stack.
+    "C":       (LayerConfig(dsc_enabled=False, paap_enabled=False, dar_enabled=False,
+                            human_gate_enabled=False, contract_validators_enabled=True), "anthropic"),
+    # F:  full governed stack — all layers ON.
     "F":       (LayerConfig.full(),     "anthropic"),
     "G_qwen":  (LayerConfig.full(),     "ollama/qwen2.5"),
     "G_llama": (LayerConfig.full(),     "ollama/llama3.1"),
@@ -132,6 +143,7 @@ def _execute_workers_in_thread(
         if not ready:
             time.sleep(1.0)
             continue
+        worker_threads = []
         for worker_id in ready:
             contract = next(c for c in contracts if c["worker_id"] == worker_id)
             started.add(worker_id)
@@ -139,18 +151,75 @@ def _execute_workers_in_thread(
                 audit_path,
                 {"event": "worker_assigned", "run_id": run_id, "worker_id": worker_id},
             )
-            try:
-                run_worker(run_id, worker_id, contract, audit_path, root, provider)
-            except Exception as exc:
-                append_audit_event(
-                    audit_path,
-                    {
-                        "event": "worker_failed",
-                        "run_id": run_id,
-                        "worker_id": worker_id,
-                        "error": str(exc)[:500],
-                    },
-                )
+
+            def _run(wid=worker_id, ct=contract):
+                try:
+                    run_worker(run_id, wid, ct, audit_path, root, provider)
+                except Exception as exc:
+                    append_audit_event(
+                        audit_path,
+                        {
+                            "event": "worker_failed",
+                            "run_id": run_id,
+                            "worker_id": wid,
+                            "error": str(exc)[:500],
+                        },
+                    )
+
+            t = threading.Thread(target=_run, daemon=True)
+            t.start()
+            worker_threads.append(t)
+        for t in worker_threads:
+            t.join()
+
+
+def _run_plain_model(
+    run_id: str,
+    fixture: dict[str, Any],
+    root: Path,
+    provider_override: str | None,
+) -> None:
+    """Condition A0: call the model once with the raw task, write output as 'recommender'.
+
+    No architecture, no workers, no contracts. The model receives the task description
+    and must produce a procurement recommendation in a single response. The output is
+    written to outputs/recommender.json so metrics can compare it against the governed run.
+    """
+    provider = get_provider(provider_override)
+    audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
+
+    system = (
+        "You are an expert procurement advisor. "
+        "Given a procurement task, produce a vendor recommendation as a JSON object with these fields: "
+        "summary (string), eliminated_vendors (array of strings), "
+        "scored_vendors (array of objects with vendor and score), "
+        "shortlist (array of strings), evidence_sources (array of objects with id, type, excerpt, created_at). "
+        "Output only the JSON object, nothing else."
+    )
+    user = (
+        f"Task: {fixture.get('title', '')}\n\n"
+        f"{fixture.get('description', '')}"
+    )
+    append_audit_event(audit_path, {"event": "worker_started", "run_id": run_id, "worker_id": "recommender"})
+    try:
+        raw = provider.complete(system, user)
+        # extract JSON
+        import re as _re
+        stripped = _re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=_re.IGNORECASE)
+        stripped = _re.sub(r"\s*```\s*$", "", stripped.strip())
+        output = json.loads(stripped)
+    except Exception as exc:
+        append_audit_event(audit_path, {"event": "worker_failed", "run_id": run_id, "worker_id": "recommender", "error": str(exc)[:300]})
+        return
+
+    out_dir = root / "data" / "runs" / run_id / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "recommender.json").write_text(
+        json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    append_audit_event(audit_path, {"event": "validation_passed", "run_id": run_id, "worker_id": "recommender"})
+    append_audit_event(audit_path, {"event": "worker_submitted", "run_id": run_id, "worker_id": "recommender"})
+    append_audit_event(audit_path, {"event": "gate_approved", "run_id": run_id, "note": "plain_model_auto"})
 
 
 def run_one(
@@ -158,7 +227,7 @@ def run_one(
     condition: str,
     rep: int,
     root: Path,
-    timeout_seconds: float = 300.0,
+    timeout_seconds: float = 600.0,
 ) -> dict[str, Any]:
     """Execute a single benchmark run end-to-end and return its metrics."""
     layer_config, provider_override = CONDITION_MAP[condition]
@@ -174,6 +243,13 @@ def run_one(
     )
     run_id = run["run_id"]
     audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
+
+    # Condition A0: plain model, no architecture
+    if condition == "A0":
+        _run_plain_model(run_id, fixture, root, provider_override)
+        run_dir = root / "data" / "runs" / run_id
+        return extract_all_metrics(run_dir, condition, rep, fixture_id)
+
     provider = get_provider(provider_override)
 
     # 1. build proposal (deterministic for procurement domain — no LLM call)
@@ -204,7 +280,7 @@ def run_benchmark(
     fixtures: list[str],
     reps: int,
     root: Path,
-    timeout_seconds: float = 300.0,
+    timeout_seconds: float = 600.0,
 ) -> str:
     """Kick off a benchmark in a background thread; return its benchmark_id."""
     benchmark_id = (

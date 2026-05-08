@@ -153,7 +153,7 @@ def threshold_issues(record: EvidenceRecord, profile: dict[str, Any]) -> list[st
             f"paap: record_score {record.score:.3f} below min_avg_score {min_avg}."
         )
     for source_id, bd in record.breakdown.items():
-        if bd["source_score"] < min_ind:
+        if round(bd["source_score"], 9) < min_ind:
             issues.append(
                 f"paap: source '{source_id}' score {bd['source_score']:.3f} below "
                 f"min_individual_score {min_ind}."

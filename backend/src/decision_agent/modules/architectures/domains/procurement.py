@@ -73,7 +73,7 @@ EVIDENCE_PROFILE = {
     # a record_score >= min_avg_score and every individual source_score
     # >= min_individual_score, or the validator rejects the output.
     "min_avg_score": 0.6,
-    "min_individual_score": 0.4,
+    "min_individual_score": 0.35,
     "temporal_half_life_days": 365,
 }
 

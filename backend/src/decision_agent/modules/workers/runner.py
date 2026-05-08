@@ -46,8 +46,9 @@ def _build_system_prompt(contract: dict[str, Any]) -> str:
         paap_block = (
             "\n\nEVIDENCE CITATION RULES (PAAP):\n"
             "- The evidence_sources field must be a JSON array of objects.\n"
-            "- Each object has: id (string), type (string), excerpt (short string), "
-            "created_at (ISO date or null).\n"
+            "- Each object has: id (string), type (string), excerpt (short string, ≤15 words), "
+            "created_at (ISO date string, e.g. '2024-01-01' — use the document date if known, "
+            "or today's date if the source is current; null only if truly unknown).\n"
             f"- type must be one of: {', '.join(allowed) if allowed else '<see contract>'}\n"
             "- Do NOT cite model_inference. Do NOT make up sources.\n"
             "- Every claim in your output must be traceable to one of the evidence_sources entries.\n"
@@ -58,10 +59,16 @@ def _build_system_prompt(contract: dict[str, Any]) -> str:
         scope = contract["scope_contract"]
         markers = scope.get("out_of_scope_markers", [])
         phrases = scope.get("scope_phrase_blocklist", [])
+        required_classes = scope.get("required_evidence_classes", [])
+        required_line = (
+            f"- You MUST cite at least one source of each required type: {', '.join(required_classes)}\n"
+            if required_classes else ""
+        )
         scope_block = (
             "\n\nSCOPE RULES (DSC):\n"
             f"- Out-of-scope markers (must NOT appear in output): {', '.join(markers) or 'none'}\n"
             f"- Forbidden phrases (must NOT appear, case-insensitive): {', '.join(phrases) or 'none'}\n"
+            f"{required_line}"
             "- Stay strictly inside the decision scope. State 'unknown' rather than speculating.\n"
         )
 
@@ -92,6 +99,7 @@ OUTPUT RULES (strictly enforced):
 - Your ENTIRE final response must be ONE valid JSON object.
 - Start your response with {{ and end with }}.
 - No preamble, no explanation, no markdown, no code fences.
+- Keep all string values SHORT. Summaries ≤ 2 sentences. Lists use brief labels, not prose paragraphs. No repetition of information already in other fields.
 - Schema you must match:
 {output_schema}{paap_block}{scope_block}"""
 
@@ -312,7 +320,9 @@ def run_worker(
                 emit(VALIDATION_FAILED, reason="Provider returned tool_use without a tool payload.")
                 raise ValueError(f"Worker {worker_id} returned an invalid tool_use response.")
 
-            messages.append({"role": "assistant", "content": response["content"]})
+            # Build tool_results BEFORE appending the assistant message so that
+            # if execute_tool raises we never leave an orphaned tool_use block
+            # in messages without a matching tool_result (causes Anthropic 400).
             tool_results = []
             for tool in tool_uses:
                 result = execute_tool(
@@ -331,15 +341,12 @@ def run_worker(
                         "content": result,
                     }
                 )
-            messages.append(
-                {
-                    "role": "user",
-                    "content": tool_results,
-                }
-            )
+            messages.append({"role": "assistant", "content": response["content"]})
+            messages.append({"role": "user", "content": tool_results})
             continue
 
-        if response.get("tool_capable") is not False and not _minimum_tool_requirement_met(called_tools, allowed_tools):
+        # Skip during nudge recovery — tools already ran, we are steering toward JSON.
+        if json_nudge_count == 0 and response.get("tool_capable") is not False and not _minimum_tool_requirement_met(called_tools, allowed_tools):
             emit(
                 VALIDATION_FAILED,
                 reason="Provider returned final text before required tool use.",
@@ -353,22 +360,25 @@ def run_worker(
         # JSON now…") with no actual JSON object and we have steps remaining,
         # nudge it once to produce the JSON. Common Sonnet failure mode on
         # complex output schemas.
-        if "{" not in raw_response and json_nudge_count < 2 and step < max_steps - 1:
+        if "{" not in raw_response and step < max_steps - 1:
             json_nudge_count += 1
             messages.append({"role": "assistant", "content": raw_response})
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "Finish the worker contract now. "
-                        "If you still need to write the markdown artifact and write_file is available, "
-                        "call write_file first. Then produce ONLY the final JSON object matching the schema. "
-                        "Begin your response with { and end with }. "
-                        "No preamble, no markdown fences, no commentary. "
-                        "Just the raw JSON."
-                    ),
-                }
-            )
+            if json_nudge_count == 1:
+                nudge = (
+                    "You have gathered all the information. Now produce the final JSON. "
+                    "If write_file is in your allowed tools and you haven't written the artifact yet, "
+                    "call write_file now. Then output ONLY the final JSON object. "
+                    "Start your response with { and end with }. No preamble."
+                )
+            else:
+                # Hard final nudge — no more tool calls, just the JSON
+                nudge = (
+                    "OUTPUT THE JSON NOW. "
+                    "Do not call any more tools. Do not explain. "
+                    "Your entire response must be a single valid JSON object starting with { and ending with }. "
+                    "Match the schema exactly. Output nothing else."
+                )
+            messages.append({"role": "user", "content": nudge})
             continue
         break
 
