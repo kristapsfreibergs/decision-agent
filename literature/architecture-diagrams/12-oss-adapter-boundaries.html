@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSS Adapter Boundaries</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar"><h1>Replaceable OSS Adapter Boundaries - Target</h1><a class="back" href="index.html">Back to index</a></div>
+      <p>Keep the decision core stable while swapping runtime, scheduler, agent, retrieval, and storage infrastructure.</p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+flowchart TB
+  Core["Decision Agent Core<br/>question graph, DSC, PAAP, DAR,<br/>outcome modeling, final answer"]
+
+  subgraph Adapters["Adapter Interfaces"]
+    RuntimeAdapter["RuntimeAdapter<br/>start, pause, resume, recover"]
+    SchedulerAdapter["SchedulerBackend<br/>ready queue, leases, retries"]
+    CheckpointAdapter["CheckpointStore<br/>save, load, expire"]
+    AgentAdapter["AgentSpawner<br/>spawn, supervise, collect"]
+    RetrievalAdapter["Retrieval connectors<br/>SQL, docs, APIs, web"]
+    StorageAdapter["StorageBackend<br/>files, DB, object store"]
+  end
+
+  subgraph OSS["Possible OSS Infrastructure"]
+    LangGraph["LangGraph<br/>durable graphs/checkpoints"]
+    Temporal["Temporal<br/>long-running workflows"]
+    Dapr["Dapr<br/>actors/workflows"]
+    AutoGen["AutoGen / Agent Framework<br/>multi-agent patterns"]
+    Connectors["Open-source parsers/connectors"]
+  end
+
+  Core --> RuntimeAdapter
+  Core --> SchedulerAdapter
+  Core --> CheckpointAdapter
+  Core --> AgentAdapter
+  Core --> RetrievalAdapter
+  Core --> StorageAdapter
+
+  RuntimeAdapter -.-> LangGraph
+  RuntimeAdapter -.-> Temporal
+  SchedulerAdapter -.-> Temporal
+  SchedulerAdapter -.-> Dapr
+  CheckpointAdapter -.-> LangGraph
+  AgentAdapter -.-> AutoGen
+  RetrievalAdapter -.-> Connectors
+  StorageAdapter -.-> Dapr
+        </pre>
+      </section>
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>

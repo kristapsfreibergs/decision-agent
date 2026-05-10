@@ -1,0 +1,1033 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reference Architecture Gap Map</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+    <style>
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 0 0 16px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        font-size: 13px;
+      }
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 1px solid rgba(0,0,0,.2);
+      }
+      .built { background: #dff3e7; }
+      .partial { background: #fff0c2; }
+      .missing { background: #ffd7d7; }
+      .core { background: #dfeaff; }
+      .claude { background: #eadcff; }
+      .diagram-card + h2 {
+        margin-top: 28px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      .tree-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 16px;
+      }
+      .tree-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 14px;
+        overflow: auto;
+      }
+      .tree-panel h3 {
+        margin: 0 0 10px;
+        font-size: 15px;
+      }
+      .file-tree,
+      .file-tree ul {
+        list-style: none;
+        margin: 0;
+        padding-left: 18px;
+      }
+      .file-tree {
+        padding-left: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: nowrap;
+      }
+      .file-tree li {
+        margin: 1px 0;
+      }
+      .node {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .folder::before {
+        content: "▸";
+        color: #64748b;
+      }
+      .file::before {
+        content: "•";
+        color: #64748b;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 1px 6px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 11px;
+        border: 1px solid rgba(0,0,0,.16);
+      }
+      .pill-built { background: #dff3e7; color: #123b22; }
+      .pill-partial { background: #fff0c2; color: #533000; }
+      .pill-missing { background: #ffd7d7; color: #5a1010; }
+      .pill-core { background: #dfeaff; color: #102b4f; }
+      .pill-claude { background: #eadcff; color: #2f1b53; border-style: dashed; }
+      .note {
+        color: #64748b;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 12px;
+      }
+      .desc {
+        display: block;
+        margin: -1px 0 4px 22px;
+        color: #64748b;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 12px;
+        line-height: 1.35;
+        white-space: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar">
+        <h1>Reference Architecture Gap Map - Current vs Target</h1>
+        <a class="back" href="index.html">Back to index</a>
+      </div>
+      <p>
+        Two views are used here with the same principle as reference agentic AI
+        architectures: the capability map shows what the system must be able to do;
+        the technology map shows the concrete components that implement those
+        capabilities.
+      </p>
+      <p>
+        Memory is shown as a separate multi-layer system, not one generic store:
+        working/context memory, run episodic memory, evidence memory, semantic/vector
+        memory, ontology memory, and user/org profile memory.
+      </p>
+      <div class="legend">
+        <span><i class="swatch built"></i>Built enough for prototype</span>
+        <span><i class="swatch partial"></i>Partial or planned V1</span>
+        <span><i class="swatch missing"></i>Missing / impairs capability</span>
+        <span><i class="swatch core"></i>Your differentiating core</span>
+        <span><i class="swatch claude"></i>Claude Code architecture pattern</span>
+      </div>
+
+      <h2>1. Layered Capability Gap Map</h2>
+      <p>
+        This is the most important architecture diagram. It follows the reference
+        structure: user/client entry, orchestration/control plane, specialized agents,
+        tools/integrations, memory/knowledge, monitoring, reliability, governance, and
+        foundation capabilities. Each node says what exists today and what missing
+        functionality impairs.
+      </p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+flowchart TB
+  subgraph Clients["0. User / Client Layer"]
+    WebClient["Web app<br/>Built: static browser UI<br/>Missing: live streaming console<br/>Impairs: weak real-time visibility"]:::partial
+    APIClient["API / SDK clients<br/>Partial: HTTP endpoints exist<br/>Missing: typed SDK, auth, webhook clients<br/>Impairs: hard enterprise integration"]:::partial
+    ChatClient["Chat / voice interface<br/>Missing<br/>Impairs: no natural operator intake channel"]:::missing
+    EnterpriseClient["Enterprise systems as clients<br/>Missing: ERP/CRM/procurement/legal trigger runs<br/>Impairs: agentic work not embedded in operations"]:::missing
+  end
+
+  subgraph Sources["1. Enterprise Data Sources / External Systems"]
+    SQLSources["Operational databases<br/>Current: SQLite demo DB only<br/>Missing: Postgres, cloud SQL, ERP/CRM schemas<br/>Impairs: real enterprise evidence access"]:::partial
+    DocumentSources["Documents and object stores<br/>Current: knowledge/ markdown files<br/>Missing: PDF/Excel/email/SharePoint/S3 ingestion<br/>Impairs: proposals, contracts, invoices, policies stay outside system"]:::missing
+    EventSources["External events and webhooks<br/>Planned: external_inputs API<br/>Missing: event bus, webhook auth, idempotency store<br/>Impairs: long-running external waits"]:::partial
+  end
+
+  subgraph Ingestion["2. Ingestion and Normalization Layer"]
+    Extract["Extract and parse<br/>Missing: OCR/PDF/Excel/email parsers<br/>Impairs: cannot turn raw enterprise files into evidence"]:::missing
+    Normalize["Normalize and annotate<br/>Partial: schema-map annotates SQLite rows<br/>Missing: unified source_id, evidence_class, created_at, authority metadata for all sources<br/>Impairs: inconsistent PAAP scoring"]:::partial
+    Index["Index and cache<br/>Missing: vector index, text index, cache, dedupe<br/>Impairs: slow repeated retrieval and weak semantic recall"]:::missing
+  end
+
+  subgraph Gateway["3. Data Gateway Layer"]
+    GatewayAPI["query_evidence / search_evidence API<br/>Missing: gateway facade over SQL/files/API/mobile<br/>Impairs: workers still use database-shaped access"]:::missing
+    ScopeEnforce["Scope enforcement before retrieval<br/>Target: DSC checks every query<br/>Missing: centralized policy enforcement<br/>Impairs: data leakage across decision boundaries"]:::missing
+    EvidenceContract["EvidenceSource contract<br/>Partial: query_sql returns typed rows<br/>Missing: one evidence envelope for all connectors<br/>Impairs: mobile/cloud parity and audit consistency"]:::partial
+  end
+
+  subgraph Ontology["4. Ontology and Semantic Model Layer"]
+    BusinessObjects["Business ontology<br/>Missing: Vendor, Contract, Budget, Risk, Requirement, Policy objects<br/>Impairs: agents reason over raw rows/files instead of typed enterprise objects"]:::missing
+    Relationships["Relationship graph<br/>Missing: vendor-to-contract, requirement-to-policy, risk-to-control links<br/>Impairs: weak traceability across evidence"]:::missing
+    Actions["Action ontology<br/>Partial: DAR consequence classes exist<br/>Missing: full action and permission model<br/>Impairs: unclear authority over autonomous actions"]:::partial
+  end
+
+  subgraph Evidence["5. Evidence and Knowledge Layer"]
+    DSC["DSC scope contracts<br/>Built"]:::core
+    PAAP["PAAP evidence scoring<br/>Built"]:::core
+    Bundle["Evidence bundle assembly<br/>Missing: pre-scoped, scored bundle locked per run<br/>Impairs: reproducibility and context budget control"]:::missing
+  end
+
+  subgraph MemoryLayers["6. Multi-Layer Memory System"]
+    WorkingMemory["Working memory<br/>Current: provider context + selected files<br/>Missing: explicit run scratchpad and context budget manager<br/>Impairs: long reasoning coherence"]:::partial
+    RunMemory["Run episodic memory<br/>Built: audit.jsonl, outputs, checkpoints<br/>Missing: queryable episode summaries<br/>Impairs: hard to recover/reason over a long run"]:::partial
+    EvidenceMemory["Evidence memory<br/>Partial: evidence/*.json PAAP records<br/>Missing: locked evidence bundle + source versioning<br/>Impairs: reproducibility"]:::partial
+    SemanticMemory["Semantic/vector memory<br/>Missing: embeddings + text index<br/>Impairs: recall across many docs/runs"]:::missing
+    OntologyMemory["Ontology memory<br/>Missing: durable business object graph<br/>Impairs: no shared enterprise semantic state"]:::missing
+    ProfileMemory["User/org profile memory<br/>Missing: preferences, policies, risk appetite, org constraints<br/>Impairs: decisions lack institutional context"]:::missing
+  end
+
+  subgraph Decision["7. Orchestration / Control Plane"]
+    Kernel["Decision kernel<br/>Partial: router and architecture proposal exist<br/>Missing: question graph, convergence loop, replan logic<br/>Impairs: cannot self-drive to one final answer"]:::partial
+    AgentKernel["Claude Code pattern: agent kernel / query engine<br/>Partial: worker runner handles tool loop<br/>Missing: unified scheduler for model calls, streaming, tool batching, cache, context<br/>Impairs: weak runtime control"]:::claude
+    PromptCompiler["Claude Code pattern: prompt compiler and cache boundary<br/>Missing: stable/dynamic prompt split, cache-break markers, cost-aware assembly<br/>Impairs: high token cost and noisy context"]:::claude
+    RuntimeHooks["Claude Code pattern: runtime hook bus<br/>Missing: before/after model, tool, memory, failure, final-answer hooks<br/>Impairs: hard to observe, govern, and extend"]:::claude
+    CommandPlane["Claude Code pattern: slash command plane<br/>Missing: /resume, /memory, /context, /doctor, /agents, /tasks, /compact<br/>Impairs: weak operator control surface"]:::claude
+    SessionTranscript["Claude Code pattern: session and transcript layer<br/>Partial: audit.jsonl exists<br/>Missing: resumable transcript, compaction history, replay cursor<br/>Impairs: weak resume/debug"]:::claude
+    ContextEngineering["Claude Code pattern: context engineering package<br/>Missing: token estimation, context visualization, collapse/recovery strategies<br/>Impairs: poor long-context management"]:::claude
+    Planner["Dynamic agent planner<br/>Partial: team generated before run<br/>Missing: runtime spawning for discovered subquestions<br/>Impairs: weak autonomous investigation"]:::partial
+    TaskDecomp["Task decomposition<br/>Partial: generated architecture roles<br/>Missing: live subquestion graph and dependency repair<br/>Impairs: brittle investigation"]:::partial
+    StateContext["State and context manager<br/>Partial: file artifacts + audit<br/>Missing: explicit context window and run scratchpad<br/>Impairs: long-run coherence"]:::partial
+    GuardrailsPolicy["Guardrails and policy in control plane<br/>Partial: DSC/PAAP/DAR<br/>Missing: unified policy on every step/tool/model<br/>Impairs: scattered enforcement"]:::partial
+    Critics["Critic/adjudicator agents<br/>Missing: red-team, contradiction, assumption checks<br/>Impairs: autonomous decisions lack internal opposition"]:::missing
+    Outcome["Outcome modeling<br/>Missing: option generation, scenario simulation, sensitivity analysis<br/>Impairs: cannot calculate outcomes across approaches"]:::missing
+  end
+
+  subgraph AgentLayer["8. Specialized Agent Layer"]
+    ResearchAgent["Research / evidence agents<br/>Partial: requirement analyst, market scout, risk assessor<br/>Missing: external research connectors<br/>Impairs: shallow discovery"]:::partial
+    ReasoningAgent["Reasoning / evaluator agents<br/>Built for procurement V1<br/>Missing: reusable cross-domain reasoning agents<br/>Impairs: narrow domain reuse"]:::partial
+    DataAgent["Data agents<br/>Partial: query_sql worker tool<br/>Missing: gateway-backed data agents<br/>Impairs: direct database coupling"]:::partial
+    ActionAgent["Action agents<br/>Missing: safe write/action agents<br/>Impairs: system can recommend but not execute operations"]:::missing
+    CommunicationAgent["Communication agents<br/>Missing: vendor/legal/finance messaging agents<br/>Impairs: cannot manage external conversations"]:::missing
+    SubagentModes["Claude Code pattern: subagent execution modes<br/>Missing: forked context, teammate, isolated worktree/session agents<br/>Impairs: dynamic spawning is underspecified"]:::claude
+    TaskManagementAgents["Claude Code pattern: task management agents<br/>Missing: task create/update/list/stop/output tools<br/>Impairs: agents cannot coordinate durable work units"]:::claude
+  end
+
+  subgraph SecurityGov["9. Security and Governance Layer"]
+    AccessControl["Access control<br/>Missing: authentication, RBAC, ABAC, per-source permissions<br/>Impairs: safe enterprise/government data access"]:::missing
+    CapabilityGate["Capability-based tool gates<br/>Partial: allowed_tools and allowed_read_paths exist<br/>Missing: per-call capabilities for shell, file, network, DB, write actions<br/>Impairs: unsafe tool execution"]:::partial
+    Privacy["Privacy and data protection<br/>Missing: PII detection, redaction, retention, purpose limits<br/>Impairs: safe handling of sensitive data"]:::missing
+    Policy["Policy enforcement<br/>Partial: DSC/PAAP/DAR cover decision logic<br/>Missing: system-wide policy checks for tools, data, models, users<br/>Impairs: inconsistent enforcement"]:::partial
+    Compliance["Compliance audit<br/>Built: audit.jsonl<br/>Missing: tamper resistance, export packages, attestations<br/>Impairs: formal governance review"]:::partial
+  end
+
+  subgraph Authority["10. Authority, Runtime, and Ops"]
+    Autonomy["Autonomy policy / DAR<br/>Partial: DAR action matrix exists<br/>Missing: policy separating final answer from external action<br/>Impairs: unclear autonomous boundary"]:::partial
+    ProactiveLoop["Claude Code pattern: background autonomy loop<br/>Missing: heartbeat asks whether anything is worth doing, then act/wait decision<br/>Impairs: system remains mostly request-driven"]:::claude
+    LongRun["Long-running runtime<br/>Missing: pause/resume in code, leases, startup recovery<br/>Impairs: days/weeks decisions"]:::missing
+    Observability["Operational observability<br/>Partial: polling UI and benchmark metrics<br/>Missing: event stream, blocker view, traces<br/>Impairs: cannot see live agent work"]:::partial
+  end
+
+  subgraph Reliability["10B. Reliability and Failure Management"]
+    ErrorDetect["Error detection<br/>Partial: JSON recovery and validators<br/>Missing: typed failure taxonomy<br/>Impairs: failures are hard to route"]:::partial
+    RetryBackoff["Retry and backoff<br/>Missing<br/>Impairs: transient provider/tool failures stop runs"]:::missing
+    FallbackAgents["Fallback / alternate agents<br/>Missing<br/>Impairs: no autonomous recovery when an agent fails"]:::missing
+    CircuitBreaker["Circuit breaker<br/>Missing<br/>Impairs: bad loops can waste tokens and time"]:::missing
+    Recovery["Checkpoint recovery<br/>Partial: file artifacts survive restart<br/>Missing: leases, heartbeat, resume cursor<br/>Impairs: long-running reliability"]:::partial
+  end
+
+  subgraph ModelOps["11. Model Access, Catalog, and Oversight"]
+    ModelCatalogLayer["Model catalog<br/>Partial: provider registry exists<br/>Missing: allowlist, eval scores, model routing, fallback rules<br/>Impairs: unmanaged model choice"]:::partial
+    ModelValidation["Validation and oversight<br/>Partial: JSON validators and benchmark metrics<br/>Missing: moderation, rate limits, anomaly checks, model monitoring<br/>Impairs: unsafe autonomous execution"]:::partial
+    ModelAccess["Secure LLM access<br/>Partial: provider abstraction<br/>Missing: credentials policy, data egress controls, per-model permissions<br/>Impairs: enterprise deployment"]:::partial
+  end
+
+  subgraph AgentLifecycle["12. Agent Lifecycle and Evaluation"]
+    AgentBuild["Agent building<br/>Partial: worker catalog + generated architecture<br/>Missing: reusable agent packages and versioning<br/>Impairs: hard to evolve agents safely"]:::partial
+    EvalSuites["Evaluation suites<br/>Partial: backend tests + benchmarks<br/>Missing: grounding, policy, long-run, and regression evals per domain<br/>Impairs: cannot prove stability"]:::partial
+    Release["Package, release, deploy<br/>Missing: domain packs, release channels, environment promotion, rollback<br/>Impairs: enterprise rollout"]:::missing
+    FeatureFlags["Claude Code pattern: feature flags and release rings<br/>Missing: compile/runtime flags, internal-only tools, staged rollout, kill switches<br/>Impairs: risky platform evolution"]:::claude
+    ArtifactSafety["Claude Code incident lesson: build artifact security<br/>Missing: sourcemap/package scanning, secret scanning, signing, provenance checks<br/>Impairs: source or secret leakage"]:::claude
+    ParityTracking["Claude Code pattern: parity and roadmap tracking<br/>Missing: PARITY.md-style implementation matrix, mock parity harness<br/>Impairs: hard to track architecture vs code"]:::claude
+  end
+
+  subgraph AppsAutomation["13. Human-AI Apps and Enterprise Automation"]
+    HumanAIApps["Human-AI applications<br/>Partial: static run UI<br/>Missing: live trace console, replay, admin/security, mobile surfaces<br/>Impairs: weak real-time understanding"]:::partial
+    EnterpriseAutomation["Enterprise automation<br/>Partial: planned external input API<br/>Missing: scheduled, event-driven, API-driven automations<br/>Impairs: cannot operate continuously"]:::partial
+    SystemsAction["Systems of action<br/>Missing: ERP/procurement/legal/ticketing write connectors<br/>Impairs: answers cannot become operational outcomes"]:::missing
+    BridgeRemote["Claude Code pattern: bridge and remote control<br/>Missing: IDE bridge, mobile/browser handoff, JWT-authenticated session control<br/>Impairs: weak remote operation"]:::claude
+  end
+
+  subgraph ToolComputeDev["14. Tool Services, Compute, and Dev Platform"]
+    ToolServicesLayer["Tool services<br/>Partial: worker tools exist<br/>Missing: typed tool catalog, permissions, action audit, sandbox policy<br/>Impairs: tool sprawl and unsafe actions"]:::partial
+    ComputeServices["Multimodal compute services<br/>Missing: batch/stream OCR, table/image/audio/video extraction<br/>Impairs: real documents remain opaque"]:::missing
+    DevEnvironments["Development environments<br/>Partial: local repo and tests<br/>Missing: sandbox, staging, replay/debug, simulated enterprise data<br/>Impairs: difficult safe iteration"]:::partial
+    Diagnostics["Claude Code pattern: doctor diagnostics<br/>Missing: provider, data gateway, memory, tool permission, run storage health checks<br/>Impairs: hard setup/debug"]:::claude
+    MagicDocs["Claude Code pattern: self-updating docs agents<br/>Missing: scoped doc-update workers with narrow write permissions<br/>Impairs: architecture docs drift from code"]:::claude
+  end
+
+  subgraph Foundation["15. Foundation / Infrastructure Layer"]
+    LLMFoundation["LLM providers and gateway<br/>Partial: provider registry<br/>Missing: model gateway, routing, rate/cost controls<br/>Impairs: weak production model operations"]:::partial
+    DataFoundation["Data storage<br/>Partial: files + SQLite<br/>Missing: Postgres/object store/vector DB/cache<br/>Impairs: weak scale and retrieval"]:::partial
+    EventFoundation["Queue / event bus<br/>Missing<br/>Impairs: no async automation or durable work dispatch"]:::missing
+    SecretsFoundation["Secrets and deployment<br/>Missing: secrets manager, containers, CI/CD environments<br/>Impairs: production deployment"]:::missing
+  end
+
+  WebClient --> Kernel
+  APIClient --> Kernel
+  ChatClient --> Kernel
+  EnterpriseClient --> EnterpriseAutomation
+  SQLSources --> Extract
+  DocumentSources --> Extract
+  EventSources --> Normalize
+  ComputeServices --> Extract
+  Extract --> Normalize
+  Normalize --> Index
+  Index --> GatewayAPI
+  Normalize --> GatewayAPI
+  ToolServicesLayer --> GatewayAPI
+  GatewayAPI --> ScopeEnforce
+  ScopeEnforce --> EvidenceContract
+  EvidenceContract --> BusinessObjects
+  BusinessObjects --> Relationships
+  Relationships --> Actions
+  Actions --> DSC
+  EvidenceContract --> PAAP
+  DSC --> Bundle
+  PAAP --> Bundle
+  Bundle --> EvidenceMemory
+  EvidenceMemory --> WorkingMemory
+  RunMemory --> WorkingMemory
+  SemanticMemory --> WorkingMemory
+  OntologyMemory --> WorkingMemory
+  ProfileMemory --> WorkingMemory
+  Relationships --> OntologyMemory
+  WorkingMemory --> PromptCompiler
+  PromptCompiler --> AgentKernel
+  AgentKernel --> Kernel
+  Kernel --> TaskDecomp
+  CommandPlane --> AgentKernel
+  SessionTranscript --> AgentKernel
+  ContextEngineering --> PromptCompiler
+  TaskDecomp --> Planner
+  Planner --> StateContext
+  StateContext --> GuardrailsPolicy
+  RuntimeHooks --> AgentKernel
+  AgentKernel --> RuntimeHooks
+  GuardrailsPolicy --> ResearchAgent
+  GuardrailsPolicy --> ReasoningAgent
+  GuardrailsPolicy --> DataAgent
+  GuardrailsPolicy --> ActionAgent
+  GuardrailsPolicy --> CommunicationAgent
+  SubagentModes --> ResearchAgent
+  SubagentModes --> ReasoningAgent
+  SubagentModes --> DataAgent
+  TaskManagementAgents --> SubagentModes
+  ResearchAgent --> ToolServicesLayer
+  DataAgent --> GatewayAPI
+  ReasoningAgent --> Critics
+  ActionAgent --> SystemsAction
+  CommunicationAgent --> EnterpriseAutomation
+  Planner --> Critics
+  Planner --> Outcome
+  AgentBuild --> Planner
+  ModelCatalogLayer --> Kernel
+  ModelValidation --> Kernel
+  Outcome --> Autonomy
+  Autonomy --> ProactiveLoop
+  Planner --> LongRun
+  ProactiveLoop --> LongRun
+  LongRun --> Observability
+  LongRun --> Recovery
+  ErrorDetect --> RetryBackoff
+  RetryBackoff --> FallbackAgents
+  FallbackAgents --> CircuitBreaker
+  CircuitBreaker --> Recovery
+  Recovery --> LongRun
+  Observability --> HumanAIApps
+  BridgeRemote --> HumanAIApps
+  EnterpriseAutomation --> EventSources
+  SystemsAction --> Actions
+  EvalSuites --> ModelValidation
+  EvalSuites --> AgentBuild
+  DevEnvironments --> EvalSuites
+  Release --> EnterpriseAutomation
+  FeatureFlags --> Release
+  ArtifactSafety --> Release
+  ParityTracking --> EvalSuites
+  ModelAccess --> ModelCatalogLayer
+  HumanAIApps --> EnterpriseAutomation
+  AccessControl --> GatewayAPI
+  AccessControl --> Kernel
+  CapabilityGate --> ToolServicesLayer
+  CapabilityGate --> AgentKernel
+  Privacy --> GatewayAPI
+  Policy --> ScopeEnforce
+  Policy --> Autonomy
+  Policy --> ModelAccess
+  Policy --> ToolServicesLayer
+  Policy --> CapabilityGate
+  Compliance --> Observability
+  MagicDocs --> DevEnvironments
+  Diagnostics --> DevEnvironments
+  LLMFoundation --> ModelAccess
+  DataFoundation --> GatewayAPI
+  DataFoundation --> WorkingMemory
+  DataFoundation --> RunMemory
+  DataFoundation --> EvidenceMemory
+  DataFoundation --> SemanticMemory
+  EventFoundation --> LongRun
+  SecretsFoundation --> ModelAccess
+  SecretsFoundation --> Release
+
+  classDef built fill:#dff3e7,stroke:#2d8a4e,color:#123b22,stroke-width:1.5px;
+  classDef partial fill:#fff0c2,stroke:#c97a1f,color:#533000,stroke-width:1.5px;
+  classDef missing fill:#ffd7d7,stroke:#c43a3a,color:#5a1010,stroke-width:1.5px;
+  classDef core fill:#dfeaff,stroke:#2b6fb3,color:#102b4f,stroke-width:2px;
+  classDef claude fill:#eadcff,stroke:#8157c2,color:#2f1b53,stroke-width:2px,stroke-dasharray: 5 3;
+        </pre>
+      </section>
+
+      <h2>2. Technology Gap Map</h2>
+      <p>
+        This is the second most important diagram. It shows concrete technologies:
+        what exists now, what adapter/gateway layer should be introduced, which memory
+        technologies fit each layer, and which connector pipelines move information
+        between them.
+      </p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+flowchart TB
+  subgraph Current["Current Prototype Technology"]
+    Browser["Static browser UI<br/>public/*.html/js/css"]:::built
+    Server["Python ThreadingHTTPServer<br/>decision_agent.server"]:::built
+    Runner["Worker runner<br/>tool loop, JSON recovery, validators"]:::built
+    QuerySQL["query_sql tool<br/>SQLite + schema-map<br/>Partial: direct DB-shaped tool"]:::partial
+    FileTools["File tools<br/>read/write/list/run_tests"]:::built
+    JsonMemory["JSONL keyword memory<br/>data/memory"]:::partial
+    Audit["audit.jsonl + file artifacts<br/>data/runs"]:::built
+    Providers["Provider registry<br/>Mock, Anthropic, Ollama"]:::built
+  end
+
+  subgraph ClientAccessTarget["Client and Access Technology Target"]
+    RESTAPI["REST API<br/>Current: server endpoints<br/>Missing: auth, typed errors, API versioning"]:::partial
+    StreamingAPI["SSE/WebSocket event stream<br/>Missing<br/>Needed for live agent UI"]:::missing
+    SDKs["Typed SDKs<br/>Python/TypeScript clients<br/>Missing"]:::missing
+    WebhookIngress["Webhook ingress<br/>Target: signed webhooks, idempotency keys, replay protection<br/>Missing"]:::missing
+  end
+
+  subgraph GatewayTarget["Data Gateway Target"]
+    GatewayService["In-process DataGateway module<br/>query_evidence, search_evidence, list_sources<br/>Missing"]:::missing
+    SourceAdapters["Source adapters<br/>SQLite, Postgres, REST, files, email, SharePoint/S3, mobile cache<br/>Missing except SQLite logic"]:::missing
+    EvidenceEnvelope["Evidence envelope<br/>id, type, excerpt, created_at, authority_weight, source_backend<br/>Partial"]:::partial
+    PolicyFilter["DSC policy filter before retrieval<br/>Missing centralized enforcement"]:::missing
+    Cache["Cache and dedupe<br/>Missing"]:::missing
+  end
+
+  subgraph MemoryTarget["Memory Stores Target"]
+    ContextStore["Working/context memory<br/>Tech: Redis/DuckDB/SQLite table + context budget manager<br/>Missing: explicit short-term run memory"]:::missing
+    EpisodeStore["Episodic run memory<br/>Tech: audit.jsonl now, target Postgres/DuckDB + summary index<br/>Partial: audit/output files"]:::partial
+    EvidenceStore["Evidence memory<br/>Tech: JSON files now, target object store + Postgres metadata + content hashes<br/>Partial: PAAP records"]:::partial
+    VectorStore["Semantic/vector memory<br/>Tech: pgvector, Qdrant, Weaviate, Chroma, FAISS + BM25/OpenSearch<br/>Missing"]:::missing
+    OntologyMemoryStore["Ontology memory<br/>Tech: Postgres graph tables, Neo4j, RDF/OWL, TypeDB, Kuzu<br/>Missing"]:::missing
+    ProfileStore["User/org profile memory<br/>Tech: policy tables, Cedar/OPA data, encrypted config store<br/>Missing"]:::missing
+  end
+
+  subgraph MemoryConnectors["Memory Connectors and Pipelines"]
+    MemoryRouter["Memory router API<br/>get_context, save_episode, cite_evidence, recall_semantic, resolve_entity<br/>Missing"]:::missing
+    ContextAssembler["Context assembler<br/>Selects scoped evidence + summaries + ontology facts under token budget<br/>Missing"]:::missing
+    Summarizer["Episode summarizer<br/>Turns audit/output events into durable run lessons<br/>Missing"]:::missing
+    Embedder["Embedding/index worker<br/>Chunks documents, creates vectors, updates BM25 index<br/>Missing"]:::missing
+    EntityResolver["Entity resolver<br/>Maps text/evidence to Vendor, Contract, Risk, Policy objects<br/>Missing"]:::missing
+    PolicySync["Policy/profile sync<br/>Loads org constraints and applies ABAC/purpose limits<br/>Missing"]:::missing
+  end
+
+  subgraph IngestionTarget["Ingestion Target"]
+    Parsers["Parsers<br/>PDF, Excel, DOCX, email, OCR<br/>Missing"]:::missing
+    ETL["ETL / normalization jobs<br/>Missing"]:::missing
+    VectorIndex["Vector + text index<br/>pgvector/FAISS/Chroma + BM25<br/>Missing"]:::missing
+    EventBus["Webhook/event bus<br/>external input, invoices, signatures, legal review<br/>Missing"]:::missing
+  end
+
+  subgraph OntologyTarget["Ontology Target"]
+    OntologyStore["Ontology store<br/>Missing: typed business object registry<br/>Could be Postgres tables, graph DB, RDF/OWL, or app-level schema"]:::missing
+    SemanticLayer["Semantic layer<br/>Missing: object permissions, relationships, computed properties<br/>Impairs: agents cannot reason over enterprise meaning"]:::missing
+    ActionModel["Action and permission model<br/>Partial: DAR consequence classes<br/>Missing: action catalog and authority scopes"]:::partial
+  end
+
+  subgraph RuntimeTarget["Runtime Target"]
+    Durable["Durable workflow backend<br/>Temporal / LangGraph / Dapr adapter<br/>Missing"]:::missing
+    QueryEngine["Claude Code pattern: Agent query engine<br/>Target: model-call scheduler, streaming multiplexer, tool batching, cache coordinator<br/>Missing as unified module"]:::claude
+    AgentLoopPipeline["Claude Code pattern: explicit agent-loop pipeline<br/>Target: input, message, history, system, API, tokens, tools, render, hooks, await<br/>Missing"]:::claude
+    PromptCacheBoundary["Claude Code pattern: prompt cache boundary<br/>Target: stable system prompt + dynamic context split, cache-break labels<br/>Missing"]:::claude
+    HookBus["Claude Code pattern: runtime hook bus<br/>Target: before/after model, tool, memory, failure, final-answer events<br/>Missing"]:::claude
+    CommandRegistryTech["Claude Code pattern: command registry<br/>Target: slash commands for resume, memory, context, doctor, agents, tasks, compact<br/>Missing"]:::claude
+    SessionTranscriptTech["Claude Code pattern: session/transcript store<br/>Target: resumable sessions, transcript replay, compaction history, cursor<br/>Missing"]:::claude
+    ContextVizTech["Claude Code pattern: context visualization and compaction<br/>Target: token estimator, context graph, collapse/recovery strategies<br/>Missing"]:::claude
+    ProactiveScheduler["Claude Code pattern: proactive autonomy scheduler<br/>Target: heartbeat loop with act/wait decision policy<br/>Missing"]:::claude
+    LeaseStore["Lease and heartbeat store<br/>Missing"]:::missing
+    CheckpointStore["Checkpoint store<br/>Partial file checkpoints"]:::partial
+    Queue["Work queue<br/>Missing"]:::missing
+  end
+
+  subgraph ReliabilityTarget["Reliability and Failure Management Target"]
+    FailureTaxonomy["Failure taxonomy<br/>Target: provider_error, tool_error, policy_block, no_evidence, loop_detected<br/>Missing"]:::missing
+    RetryPolicy["Retry/backoff policy<br/>Target: Tenacity/backoff + durable attempt records<br/>Missing"]:::missing
+    CircuitBreakerTech["Circuit breaker<br/>Target: provider/tool circuit state in lease store<br/>Missing"]:::missing
+    AlternateAgentDispatch["Alternate agent dispatch<br/>Target: fallback worker or critic when primary fails<br/>Missing"]:::missing
+    HeartbeatMonitor["Heartbeat monitor<br/>Target: stale lease detection and resume cursor<br/>Missing"]:::missing
+  end
+
+  subgraph SecurityTarget["Security and Governance Target"]
+    APIAuth["API auth + RBAC<br/>Missing"]:::missing
+    ABAC["ABAC / purpose-based access<br/>Missing<br/>Impairs: scoped enterprise data access"]:::missing
+    CapabilityPolicy["Claude Code pattern: capability policy service<br/>Target: shell/file/network/DB/write permissions per agent and tool call<br/>Partial concept exists in allowed_tools"]:::claude
+    DataPrivacy["PII detection + redaction<br/>Missing<br/>Impairs: sensitive data safety"]:::missing
+    PolicyEngine["Policy engine<br/>Missing: OPA/Cedar/custom policy adapter<br/>Impairs: scattered enforcement"]:::missing
+    Secrets["Secrets manager<br/>Vault/KMS/env policy<br/>Missing"]:::missing
+    AuditExport["Compliance audit export<br/>Partial: audit.jsonl exists<br/>Missing: signed/tamper-evident audit packages"]:::partial
+  end
+
+  subgraph OpsTarget["Operations Target"]
+    Tracing["OpenTelemetry traces + live event stream<br/>Missing"]:::missing
+    Cost["Token/cost/rate gateway<br/>Partial metrics, missing gateway"]:::partial
+    CICD["Packaging, CI/CD, deploy targets<br/>Missing"]:::missing
+  end
+
+  subgraph ModelCatalogTarget["Model Catalog, Access, and Validation Target"]
+    ModelRegistry["Model registry<br/>Current: provider registry<br/>Target: model cards, allowlists, cost/latency/eval metadata<br/>Partial"]:::partial
+    ModelRouter["Model router<br/>Target: route by task, risk, data class, budget, fallback policy<br/>Missing"]:::missing
+    ModelEvalStore["Model eval store<br/>Target: grounding, policy, long-run, regression scores per model<br/>Missing"]:::missing
+    GuardrailService["Guardrail service<br/>Target: moderation, prompt/data egress filters, rate limits<br/>Missing"]:::missing
+  end
+
+  subgraph AgentLifecycleTarget["Agent Lifecycle and Evaluation Target"]
+    AgentRegistry["Agent registry<br/>Current: WORKER_CATALOG and generated workers<br/>Missing: versioned reusable agent specs"]:::partial
+    SubagentRuntime["Claude Code pattern: subagent runtime modes<br/>Target: forked context, teammate, isolated worktree/session execution<br/>Missing"]:::claude
+    TaskStoreTech["Claude Code pattern: task store<br/>Target: create/update/list/stop/output agent work units<br/>Missing"]:::claude
+    AgentVersioning["Agent versioning<br/>Target: semantic versions, compatibility, rollback metadata<br/>Missing"]:::missing
+    EvalHarness["Evaluation harness<br/>Current: unit tests and benchmark scripts<br/>Missing: domain eval suites and replay-based regression"]:::partial
+    ReleaseManager["Release manager<br/>Target: package domain packs, promote sandbox to prod, rollback<br/>Missing"]:::missing
+    FeatureFlagService["Claude Code pattern: feature flag service<br/>Target: runtime flags, release rings, internal-only tools, kill switches<br/>Missing"]:::claude
+    ArtifactScanner["Claude Code incident lesson: artifact scanner<br/>Target: sourcemap, secret, dependency, provenance and signing checks<br/>Missing"]:::claude
+    ParityHarnessTech["Claude Code pattern: parity harness<br/>Target: PARITY.md, roadmap matrix, deterministic mock parity tests<br/>Missing"]:::claude
+  end
+
+  subgraph AppAutomationTarget["Human-AI Apps and Enterprise Automation Target"]
+    LiveConsole["Live agent console<br/>Current: static UI and polling<br/>Missing: event stream, timeline, blocker view, trace graph"]:::partial
+    ReplayDebugger["Replay/debug UI<br/>Partial: audit files exist<br/>Missing: visual replay and what-if reruns"]:::partial
+    BridgeService["Claude Code pattern: bridge service<br/>Target: IDE/browser/mobile remote session bridge with JWT auth<br/>Missing"]:::claude
+    DoctorService["Claude Code pattern: doctor service<br/>Target: provider, gateway, memory, permission, storage, model access checks<br/>Missing"]:::claude
+    AutomationScheduler["Automation scheduler<br/>Target: scheduled, event-driven, API-driven run triggers<br/>Missing"]:::missing
+    NotificationService["Notification service<br/>Target: desktop/mobile/email/Slack alerts for autonomous work<br/>Missing"]:::missing
+    EnterpriseConnectors["Enterprise action connectors<br/>Target: ERP, procurement, legal, ticketing, email, calendar<br/>Missing"]:::missing
+  end
+
+  subgraph ToolComputeTarget["Tool Services, Compute, and Dev Environments Target"]
+    ToolRegistry["Typed tool registry<br/>Current: TOOL_DEFINITIONS<br/>Missing: permission classes, risk labels, ownership"]:::partial
+    ToolSandbox["Tool sandbox and action audit<br/>Current: scoped file paths for workers<br/>Missing: per-tool policy, network limits, action approval rules"]:::partial
+    MultimodalServices["Multimodal compute services<br/>Target: OCR, table extraction, image/audio/video, batch and streaming jobs<br/>Missing"]:::missing
+    MagicDocsWorker["Claude Code pattern: scoped docs worker<br/>Target: one-file write scope, auto-refresh architecture docs from code<br/>Missing"]:::claude
+    DevSandbox["Dev, sandbox, staging environments<br/>Current: local repo/tests<br/>Missing: seeded enterprise simulator and release environments"]:::partial
+  end
+
+  subgraph FoundationTarget["Foundation / Infrastructure Technology Target"]
+    ModelGateway["Model gateway<br/>Target: LiteLLM/custom gateway for routing, budgets, rate limits<br/>Missing"]:::missing
+    PrimaryDB["Primary database<br/>Target: Postgres for runs, memory metadata, ontology tables<br/>Missing"]:::missing
+    ObjectStorage["Object/blob storage<br/>Target: S3/Azure Blob/local object store for documents and evidence bundles<br/>Missing"]:::missing
+    VectorDB["Vector/text retrieval infra<br/>Target: pgvector/Qdrant/Weaviate/FAISS + OpenSearch/BM25<br/>Missing"]:::missing
+    CacheInfra["Cache<br/>Target: Redis/Memcached for context, locks, rate state<br/>Missing"]:::missing
+    EventInfra["Queue/event bus<br/>Target: Redis Streams, Kafka, SQS, Dapr pubsub<br/>Missing"]:::missing
+    SecretsInfra["Secrets manager<br/>Target: Vault/KMS/platform secrets<br/>Missing"]:::missing
+    DeployInfra["Deployment<br/>Target: containers, Kubernetes/serverless, CI/CD promotion<br/>Missing"]:::missing
+  end
+
+  Browser --> Server
+  Browser --> RESTAPI
+  RESTAPI --> Server
+  StreamingAPI --> Browser
+  SDKs --> RESTAPI
+  WebhookIngress --> EventBus
+  Server --> Runner
+  Server --> QueryEngine
+  QueryEngine --> AgentLoopPipeline
+  AgentLoopPipeline --> SessionTranscriptTech
+  CommandRegistryTech --> QueryEngine
+  SessionTranscriptTech --> QueryEngine
+  ContextVizTech --> PromptCacheBoundary
+  QueryEngine --> Runner
+  PromptCacheBoundary --> QueryEngine
+  QueryEngine --> HookBus
+  HookBus --> Tracing
+  ProactiveScheduler --> QueryEngine
+  ProactiveScheduler --> Queue
+  Runner --> QuerySQL
+  Runner --> FileTools
+  Runner --> JsonMemory
+  Runner --> Providers
+  Runner --> Audit
+  Providers --> ModelRegistry
+  Providers --> ModelGateway
+  ModelGateway --> ModelRouter
+  ModelRegistry --> ModelRouter
+  ModelEvalStore --> ModelRouter
+  GuardrailService --> ModelRouter
+  ModelRouter --> Providers
+  GuardrailService --> Runner
+  Runner --> AgentRegistry
+  AgentRegistry --> SubagentRuntime
+  SubagentRuntime --> QueryEngine
+  SubagentRuntime --> TaskStoreTech
+  TaskStoreTech --> SessionTranscriptTech
+  AgentRegistry --> AgentVersioning
+  AgentVersioning --> ReleaseManager
+  FeatureFlagService --> QueryEngine
+  FeatureFlagService --> ReleaseManager
+  ArtifactScanner --> ReleaseManager
+  ParityHarnessTech --> EvalHarness
+  EvalHarness --> ModelEvalStore
+  EvalHarness --> AgentRegistry
+  ReleaseManager --> CICD
+  Server --> LiveConsole
+  Tracing --> LiveConsole
+  Audit --> ReplayDebugger
+  BridgeService --> Server
+  BridgeService --> LiveConsole
+  DoctorService --> LiveConsole
+  DoctorService --> Server
+  EventBus --> AutomationScheduler
+  AutomationScheduler --> Queue
+  AutomationScheduler --> NotificationService
+  AutomationScheduler --> EnterpriseConnectors
+  EnterpriseConnectors --> SourceAdapters
+  Runner --> ToolRegistry
+  ToolRegistry --> ToolSandbox
+  ToolSandbox --> Runner
+  MultimodalServices --> Parsers
+  MagicDocsWorker --> DevSandbox
+  DevSandbox --> EvalHarness
+  DevSandbox --> CICD
+
+  QuerySQL --> GatewayService
+  FileTools --> GatewayService
+  JsonMemory --> GatewayService
+  GatewayService --> SourceAdapters
+  GatewayService --> EvidenceEnvelope
+  GatewayService --> PolicyFilter
+  GatewayService --> Cache
+  GatewayService --> EvidenceStore
+  SourceAdapters --> Parsers
+  SourceAdapters --> ETL
+  SourceAdapters --> EventBus
+  ETL --> VectorIndex
+  VectorIndex --> Embedder
+  Embedder --> VectorStore
+  VectorStore --> GatewayService
+  EvidenceEnvelope --> OntologyStore
+  OntologyStore --> SemanticLayer
+  SemanticLayer --> ActionModel
+  ActionModel --> Runner
+  OntologyStore --> OntologyMemoryStore
+  EvidenceEnvelope --> EntityResolver
+  EntityResolver --> OntologyMemoryStore
+  Audit --> Summarizer
+  Summarizer --> EpisodeStore
+  Summarizer --> MemoryRouter
+  PolicyEngine --> PolicySync
+  PolicySync --> ProfileStore
+  GatewayService --> MemoryRouter
+  Runner --> MemoryRouter
+  MemoryRouter --> EvidenceStore
+  MemoryRouter --> EpisodeStore
+  MemoryRouter --> VectorStore
+  MemoryRouter --> OntologyMemoryStore
+  MemoryRouter --> ProfileStore
+  EvidenceStore --> ContextAssembler
+  EpisodeStore --> ContextAssembler
+  VectorStore --> ContextAssembler
+  OntologyMemoryStore --> ContextAssembler
+  ProfileStore --> ContextAssembler
+  ContextAssembler --> ContextStore
+  ContextStore --> Runner
+
+  Server --> Durable
+  Durable --> QueryEngine
+  Durable --> Queue
+  Durable --> LeaseStore
+  Durable --> CheckpointStore
+  CheckpointStore --> Runner
+  Durable --> HeartbeatMonitor
+  LeaseStore --> HeartbeatMonitor
+  Runner --> FailureTaxonomy
+  FailureTaxonomy --> RetryPolicy
+  RetryPolicy --> AlternateAgentDispatch
+  AlternateAgentDispatch --> Runner
+  FailureTaxonomy --> CircuitBreakerTech
+  CircuitBreakerTech --> LeaseStore
+
+  Server --> APIAuth
+  APIAuth --> ABAC
+  ABAC --> PolicyEngine
+  PolicyEngine --> CapabilityPolicy
+  CapabilityPolicy --> ToolSandbox
+  CapabilityPolicy --> QueryEngine
+  DataPrivacy --> GatewayService
+  PolicyEngine --> PolicyFilter
+  PolicyEngine --> GuardrailService
+  PolicyEngine --> ToolSandbox
+  PolicyEngine --> ModelRouter
+  Audit --> AuditExport
+  APIAuth --> Secrets
+  Secrets --> SecretsInfra
+  Runner --> Tracing
+  Providers --> Cost
+  Server --> CICD
+  PrimaryDB --> Durable
+  PrimaryDB --> GatewayService
+  PrimaryDB --> EpisodeStore
+  ObjectStorage --> EvidenceStore
+  ObjectStorage --> Parsers
+  VectorDB --> VectorStore
+  CacheInfra --> Cache
+  CacheInfra --> ContextStore
+  EventInfra --> Queue
+  EventInfra --> EventBus
+  SecretsInfra --> APIAuth
+  DeployInfra --> CICD
+
+  classDef built fill:#dff3e7,stroke:#2d8a4e,color:#123b22,stroke-width:1.5px;
+  classDef partial fill:#fff0c2,stroke:#c97a1f,color:#533000,stroke-width:1.5px;
+  classDef missing fill:#ffd7d7,stroke:#c43a3a,color:#5a1010,stroke-width:1.5px;
+  classDef core fill:#dfeaff,stroke:#2b6fb3,color:#102b4f,stroke-width:2px;
+  classDef claude fill:#eadcff,stroke:#8157c2,color:#2f1b53,stroke-width:2px,stroke-dasharray: 5 3;
+        </pre>
+      </section>
+
+      <h2>3. Folder Structure Gap Map</h2>
+      <p>
+        This is a direct tree view: left side is what the repository has now, right side
+        is the best-practice target shape for a long-running autonomous decision-agent
+        platform. Colors use the same gap-map legend.
+      </p>
+      <section class="tree-grid">
+        <div class="tree-panel">
+          <h3>Current Structure</h3>
+          <ul class="file-tree">
+            <li><span class="node folder">decision-agent/ <span class="pill pill-built">current</span></span>
+              <span class="desc">Current: One repo containing backend, static UI, data fixtures, docs, and architecture literature.</span>
+              <ul>
+                <li><span class="node folder">.claude/ <span class="pill pill-partial">local config</span></span><span class="desc">Current: Local assistant/project configuration, not part of the runtime architecture.</span></li>
+                <li><span class="node folder">.tmp/ <span class="pill pill-partial">scratch</span></span><span class="desc">Current: Temporary working files and generated scratch artifacts.</span></li>
+                <li><span class="node folder">backend/ <span class="pill pill-built">backend root</span></span>
+                  <span class="desc">Current: Contains the Python service, decision engine, worker runner, governance logic, and shared providers.</span>
+                  <ul>
+                    <li><span class="node folder">src/decision_agent/ <span class="pill pill-built">Python package</span></span>
+                      <span class="desc">Current: Main Python package where API, modules, provider abstractions, memory, and audit live.</span>
+                      <ul>
+                        <li><span class="node file">server.py <span class="pill pill-partial">API + scheduler mixed</span></span><span class="desc">Current: Serves HTTP endpoints and also owns scheduler-thread behavior that should move into runtime.</span></li>
+                        <li><span class="node file">cli.py <span class="pill pill-partial">thin entrypoint</span></span><span class="desc">Current: Provides local command entry but not a full operator command system.</span></li>
+                        <li><span class="node file">settings.py <span class="pill pill-built">config</span></span><span class="desc">Current: Centralizes basic application settings.</span></li>
+                        <li><span class="node folder">modules/ <span class="pill pill-core">decision engine</span></span>
+                          <span class="desc">Current: Strong domain and governance modules; best kept as the decision engine layer.</span>
+                          <ul>
+                            <li><span class="node folder">architectures/ <span class="pill pill-core">topology + domains</span></span><span class="desc">Current: Builds decision-team topology and domain worker catalogs such as procurement.</span></li>
+                            <li><span class="node folder">contracts/ <span class="pill pill-core">contracts + validators</span></span><span class="desc">Current: Generates worker contracts and validates structured outputs.</span></li>
+                            <li><span class="node folder">decisions/ <span class="pill pill-partial">router + suggestions</span></span><span class="desc">Current: Routes incoming decision requests and suggests architecture choices.</span></li>
+                            <li><span class="node folder">evaluation/ <span class="pill pill-partial">benchmarks</span></span><span class="desc">Current: Holds benchmark runners, metrics, fixtures, and auto-approval utilities.</span></li>
+                            <li><span class="node folder">governance/ <span class="pill pill-core">DSC, PAAP, DAR</span></span><span class="desc">Current: Contains your strongest differentiator: scope contracts, evidence scoring, and action authorization.</span></li>
+                            <li><span class="node folder">runs/ <span class="pill pill-partial">state + scheduler</span></span><span class="desc">Current: Manages run records, status derivation, service functions, and basic readiness scheduling.</span></li>
+                            <li><span class="node folder">workers/ <span class="pill pill-partial">runner.py + tools.py too heavy</span></span><span class="desc">Current: Combines prompt building, context loading, tool execution, retries, validation, and output submission.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">shared/ <span class="pill pill-partial">low-level shared code</span></span>
+                          <span class="desc">Current: Shared infrastructure primitives used by modules, especially providers, memory, and audit logging.</span>
+                          <ul>
+                            <li><span class="node folder">memory/ <span class="pill pill-partial">keyword JSONL memory</span></span><span class="desc">Current: Provides simple filesystem keyword memory, not yet multi-layer semantic or episodic memory.</span></li>
+                            <li><span class="node folder">providers/ <span class="pill pill-partial">Mock, Anthropic, Ollama</span></span><span class="desc">Current: Abstracts LLM providers and fallback behavior, but lacks full model catalog/routing policy.</span></li>
+                            <li><span class="node file">audit_log.py <span class="pill pill-built">append-only events</span></span><span class="desc">Current: Gives the project a solid event backbone through JSONL audit events.</span></li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+                <li><span class="node folder">configs/ <span class="pill pill-partial">schema maps</span></span><span class="desc">Current: Stores datasource/schema configuration used by tools such as SQL query access.</span></li>
+                <li><span class="node folder">data/ <span class="pill pill-partial">runs, memory, artifacts</span></span><span class="desc">Current: File-backed persistence for runs, audit trails, outputs, and memory.</span></li>
+                <li><span class="node folder">docs/ <span class="pill pill-partial">notes and plans</span></span><span class="desc">Current: Holds project documentation, architecture notes, benchmark findings, and planning material.</span></li>
+                <li><span class="node folder">examples/ <span class="pill pill-partial">examples</span></span><span class="desc">Current: Contains sample inputs or usage examples for demonstrations.</span></li>
+                <li><span class="node folder">knowledge/ <span class="pill pill-partial">markdown knowledge</span></span><span class="desc">Current: Acts as lightweight document knowledge before real ingestion and retrieval exist.</span></li>
+                <li><span class="node folder">literature/ <span class="pill pill-partial">architecture diagrams</span></span><span class="desc">Current: Stores research notes and architecture diagrams, including this gap map.</span></li>
+                <li><span class="node folder">public/ <span class="pill pill-partial">static UI</span></span><span class="desc">Current: Provides a browser UI but lacks live trace streaming and deep run introspection.</span></li>
+                <li><span class="node folder">scripts/ <span class="pill pill-partial">utilities</span></span><span class="desc">Current: Utility scripts for local operation and supporting workflows.</span></li>
+                <li><span class="node file">ARCHITECTURE.md <span class="pill pill-partial">architecture doc</span></span><span class="desc">Current: Human-readable architecture description that should stay synchronized with the implementation.</span></li>
+                <li><span class="node file">README.md <span class="pill pill-built">project readme</span></span><span class="desc">Current: Main project introduction and usage entrypoint.</span></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+
+        <div class="tree-panel">
+          <h3>Recommended Target Structure <span class="note">(updated from Claude Code source analysis)</span></h3>
+          <ul class="file-tree">
+            <li><span class="node folder">decision-agent/ <span class="pill pill-built">same repo</span></span>
+              <span class="desc">Best practice: Keep one product repo, but separate decision logic from runtime, integrations, and operator surfaces.</span>
+              <ul>
+                <li><span class="node folder">backend/ <span class="pill pill-built">backend root</span></span>
+                  <span class="desc">Best practice: Backend owns durable runtime, domain decision logic, integrations, APIs, and operational automation.</span>
+                  <ul>
+                    <li><span class="node folder">src/decision_agent/ <span class="pill pill-built">Python package</span></span>
+                      <span class="desc">Best practice: Main package should expose clear layers rather than concentrating runtime concerns in workers and server. Claude Code: ~163K lines TypeScript across 33+ subdirectories.</span>
+                      <ul>
+                        <li><span class="node folder">cli/ <span class="pill pill-missing">product entrypoints</span></span>
+                          <span class="desc">Should contain CLI/REPL entrypoints, structured transports, non-interactive mode, and command routing. Claude Code: main.tsx (4,683 lines, REPL) + QueryEngine.ts (SDK/headless entry) as two distinct entry points.</span>
+                          <ul>
+                            <li><span class="node file">main.py</span><span class="desc">Should bootstrap the CLI and REPL, parse top-level commands, and hand work to runtime or commands.</span></li>
+                            <li><span class="node file">query_engine.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should be the SDK/headless entry point separate from the interactive REPL. Claude Code: QueryEngine.ts manages SDK query lifecycle independently from main.tsx.</span></li>
+                            <li><span class="node file">repl.py</span><span class="desc">Should provide interactive terminal sessions with history and slash-command support.</span></li>
+                            <li><span class="node file">transports.py</span><span class="desc">Should support stdin/stdout, JSON streaming, API, and future bridge transports. Claude Code: cli/ subdirectory with stdio and structured transports.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">api/ <span class="pill pill-partial">HTTP server — seed: server.py</span></span>
+                          <span class="desc">Should own all REST API route handlers, static file serving, and request middleware. Currently mixed into server.py (DecisionAgentHandler with ~20 routes + background scheduler). C4 L2 shows this as its own container. Scheduler logic should migrate to runtime/ or daemon/.</span>
+                          <ul>
+                            <li><span class="node file">server.py <span class="pill pill-partial">seed exists</span></span><span class="desc">HTTP handler (DecisionAgentHandler). Currently handles routes, static serving, and background scheduler thread — the scheduler belongs in daemon/ or runtime/.</span></li>
+                            <li><span class="node file">routes.py</span><span class="desc">Should define all REST route patterns and map them to handler functions. Currently inline in server.py do_GET / do_POST dispatch.</span></li>
+                            <li><span class="node file">middleware.py <span class="pill pill-missing">needed</span></span><span class="desc">Should handle authentication, CORS, rate limiting, and request logging before routes are dispatched.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node file">config.py <span class="pill pill-partial">seed: settings.py</span></span>
+                          <span class="desc">Should centralize all application configuration: Settings dataclass, .env loading, feature flags, path resolution. Seed exists as settings.py (Settings dataclass with root/host/port, get_settings(), load_env_file()).</span>
+                        </li>
+                        <li><span class="node folder">runtime/ <span class="pill pill-missing">agent OS core</span></span>
+                          <span class="desc">Should contain the durable agent loop, prompt/context compiler, hooks, sessions, transcripts, and cost tracking. Claude Code: query.ts (785KB, largest single file) + query/ subdirectory for loop internals.</span>
+                          <ul>
+                            <li><span class="node file">agent_loop.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should make the turn loop explicit: input, history, context, model, tools, hooks, output, await. Claude Code: generator-based with yield/streaming; pipeline is normalizeMessagesForAPI → fetchSystemPromptParts → model → tools → postSamplingHooks.</span></li>
+                            <li><span class="node folder">query/ <span class="pill pill-claude">Claude pattern</span></span>
+                              <span class="desc">Should decompose the agent loop internals into focused modules. Claude Code: query/ subdirectory holds loop-internal concerns separately from the outer loop file.</span>
+                              <ul>
+                                <li><span class="node file">config.py</span><span class="desc">Should hold query configuration, provider settings, and sampling parameters per turn. Claude Code: query/config.ts.</span></li>
+                                <li><span class="node file">stop_hooks.py</span><span class="desc">Should handle stop conditions, stop-failure events, and command lifecycle notifications. Claude Code: query/stopHooks.ts + handleStopHooks().</span></li>
+                                <li><span class="node file">token_budget.py</span><span class="desc">Should track per-turn budgets, enforce MAX_OUTPUT_TOKENS_RECOVERY_LIMIT, and decide what gets included or dropped. Claude Code: query/tokenBudget.ts with getCurrentTurnTokenBudget() + checkTokenBudget() + createBudgetTracker().</span></li>
+                                <li><span class="node file">deps.py</span><span class="desc">Should manage inter-query dependencies and shared state across concurrent turns. Claude Code: query/deps.ts.</span></li>
+                              </ul>
+                            </li>
+                            <li><span class="node file">context_compiler.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should assemble prompt sections from scope, memory, evidence, ontology, and task state. Claude Code: fetchSystemPromptParts() builds the dynamic system prompt; normalizeMessagesForAPI() prepares history.</span></li>
+                            <li><span class="node file">compaction.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should summarize long transcripts and preserve durable state. Claude Code: services/compact/ with 3 confirmed strategies — reactive (compress on API error), micro (compress message pairs), trimmed (selective history trimming). autoCompact() triggered on thresholds.</span></li>
+                            <li><span class="node file">context_collapse.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should collapse large context sections without full compaction. Claude Code: services/contextCollapse/ module for mid-run context reduction without destroying history.</span></li>
+                            <li><span class="node file">hooks.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should expose before/after events for model calls, tool calls, memory writes, failures, and final answers. Claude Code: executePostSamplingHooks() + stopFailureHooks + commandLifecycle hooks (start/end notifications).</span></li>
+                            <li><span class="node file">session_store.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should persist resumable sessions in .jsonl format, resumable via --resume [session-id|latest]. Claude Code: sessions stored in .claude/sessions/*.jsonl.</span></li>
+                            <li><span class="node file">transcript_store.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should store replayable conversation and tool-call transcripts for debugging and resume. Claude Code: history.ts with message types UserMessage, AssistantMessage, TombstoneMessage, ToolUseSummaryMessage, AttachmentMessage.</span></li>
+                            <li><span class="node file">cost_tracker.py <span class="pill pill-partial">started in metrics</span></span><span class="desc">Should track token, latency, model, and money usage by run, agent, and tool. Claude Code: cost-tracker.ts at root level, tracks API cost per session.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">commands/ <span class="pill pill-claude">Claude pattern</span></span>
+                          <span class="desc">Should contain operator commands so the same runtime can be controlled from CLI, UI, API, or chat. Claude Code: ~87 slash commands in commands/ subdirectory; commands.ts registry is ~25K lines.</span>
+                          <ul>
+                            <li><span class="node file">registry.py</span><span class="desc">Should register command names, schemas, permissions, and handler functions. Claude Code: commands.ts + utils/commandLifecycle.ts for lifecycle hooks.</span></li>
+                            <li><span class="node folder">builtin/ <span class="note">~87 confirmed — session: resume, session, export, status, cost, usage, stats · code: commit, commit-push-pr, review, security-review, diff, pr, issue, branch, tag · workspace: init, memory, skills, agents, tasks, files, compact, clear, rewind, plan, teleport, thinkback · config: config, model, theme, permissions, output-style, keybindings · diagnostics: doctor, debug-tool-call, heapdump · IDE/bridge: vim, voice, desktop, ide, bridge · automation: hooks, cron, advisor, providers · MCP/plugins: mcp, plugin · misc: help, version, release-notes, context, subagent, team, insights, sandbox</span></span><span class="desc">Should hold reusable commands for runtime introspection and operator control, organized by domain category. All names confirmed from Claude Code source.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">tools/ <span class="pill pill-missing">extract from workers/tools.py</span></span>
+                          <span class="desc">Should separate tool definitions, permissions, execution, and built-in tools from worker prompt logic. Claude Code: tools/ (40+ implementations across 44 subdirectories) + services/tools/ for orchestration logic.</span>
+                          <ul>
+                            <li><span class="node file">registry.py <span class="pill pill-partial">TOOL_DEFINITIONS seed exists</span></span><span class="desc">Should define typed tool schemas, ownership, risk class, and allowed execution modes. Claude Code: Tool.ts interface + buildTool() factory + tools.ts preset registration.</span></li>
+                            <li><span class="node file">permissions.py <span class="pill pill-claude">capability policy</span></span><span class="desc">Should enforce file, shell, database, web, network, and external-action capabilities. Claude Code: 3 permission modes (default/bypass/strict) + ML classifier for automated permission inference + persistent permission rules in ToolUseContext.</span></li>
+                            <li><span class="node file">executor.py <span class="pill pill-partial">execute_tool seed exists</span></span><span class="desc">Should centralize execution, audit emission, policy checks, retries, and structured errors. Claude Code: StreamingToolExecutor for parallel execution + toolOrchestration.ts + generateToolUseSummary() + applyToolResultBudget().</span></li>
+                            <li><span class="node folder">builtin/ <span class="note">40+ confirmed — file: read, edit, write, glob, grep · system: bash, powershell · web: web_fetch, web_search · tasks: task_create, task_update, task_get, task_list, task_stop, task_output · agents: agent, send_message · git: enter_worktree, exit_worktree · planning: enter_plan_mode, exit_plan_mode · teams: team_create, team_delete · MCP: mcp, list_mcp_resources, read_mcp_resource, mcp_auth · misc: tool_search, skill, schedule_cron, remote_trigger, notebook_edit, repl, lsp, ask_user_question, todo_write, sleep, brief, synthetic_output</span></span><span class="desc">Should keep built-in tools small, typed, testable, and permission-scoped. All names confirmed from Claude Code source analysis.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">agents/ <span class="pill pill-missing">runtime spawning</span></span>
+                          <span class="desc">Should manage reusable agent specs, runtime spawning, teams, tasks, and isolation modes. Claude Code: coordinator/ module for multi-agent orchestration; AgentTool spawns typed sub-agents.</span>
+                          <ul>
+                            <li><span class="node file">registry.py <span class="pill pill-partial">WORKER_CATALOG seed exists</span></span><span class="desc">Should register reusable agent profiles independent of one domain catalog.</span></li>
+                            <li><span class="node file">coordinator.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should orchestrate multi-agent runs: spawn, supervise, cancel, and collect results. Claude Code: coordinator/ is the confirmed module name. Handles AgentTool + SendMessageTool coordination.</span></li>
+                            <li><span class="node file">subagent.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should implement forked-context, teammate, and isolated-session subagent modes. Claude Code: AgentTool spawns typed sub-agents; worktree isolation via EnterWorktreeTool/ExitWorktreeTool for filesystem safety.</span></li>
+                            <li><span class="node file">team.py <span class="pill pill-claude">parallel teams</span></span><span class="desc">Should coordinate groups of agents working on separate subquestions. Claude Code: TeamCreateTool + TeamDeleteTool + teamMemorySync service for shared cross-agent memory.</span></li>
+                            <li><span class="node file">task_store.py <span class="pill pill-claude">durable tasks</span></span><span class="desc">Should persist task create/update/list/stop/result records across long-running work. Claude Code: tasks/ module with full CRUD tool set; background task support feature-flagged via taskSummaryModule.</span></li>
+                            <li><span class="node file">isolation.py <span class="pill pill-missing">sessions/worktrees</span></span><span class="desc">Should define safe boundaries for workspace, files, credentials, and tool permissions. Claude Code: git worktree isolation is the primary mechanism — each agent gets an isolated git worktree.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">memory/ <span class="pill pill-missing">7-layer memory</span></span>
+                          <span class="desc">Should implement the confirmed 7-layer memory hierarchy from Claude Code's memdir/ module. Each layer has different scope, persistence, and eviction rules.</span>
+                          <ul>
+                            <li><span class="node file">working.py <span class="note">layer 1 — turn-local</span></span><span class="desc">Should hold short-term scratchpad visible only within a single turn. Claude Code memdir/ layer 1: does not survive past turn boundary.</span></li>
+                            <li><span class="node file">session.py <span class="note">layer 2 — session-scoped</span></span><span class="desc">Should persist across turns within one session. Claude Code memdir/ layer 2: stored as .jsonl in .claude/sessions/, resumable via session-id.</span></li>
+                            <li><span class="node file">project.py <span class="note">layer 3 — project-scoped</span></span><span class="desc">Should read CLAUDE.md and .claude/ directory for project-level instructions and context. Claude Code memdir/ layer 3: CLAUDE.md + .claude/ project config is the canonical project memory.</span></li>
+                            <li><span class="node file">user.py <span class="note">layer 4 — user-scoped</span></span><span class="desc">Should persist personal preferences and user-level context across all projects. Claude Code memdir/ layer 4: ~/.claude/ global store.</span></li>
+                            <li><span class="node file">team.py <span class="note">layer 5 — team-scoped</span></span><span class="desc">Should share memory across team members working in the same context. Claude Code memdir/ layer 5: teamMemorySync service for cross-agent/cross-user shared memory.</span></li>
+                            <li><span class="node file">indexed.py <span class="note">layer 6 — long-term indexed</span></span><span class="desc">Should provide durable, searchable long-term memory across sessions and projects. Claude Code memdir/ layer 6: indexed and searchable. Decision-agent: maps to FilesystemMemory + future semantic index.</span></li>
+                            <li><span class="node file">dream.py <span class="pill pill-claude">layer 7 — autoDream</span></span><span class="desc">Should autonomously consolidate, dedupe, prune, and learn from accumulated memory outside active turns. Claude Code memdir/ layer 7: dream/autoDream runs offline to improve future recall.</span></li>
+                            <li><span class="node file">evidence.py <span class="pill pill-partial">PAAP seed exists</span></span><span class="desc">Decision-agent specific layer on top of indexed memory: manages locked, versioned evidence bundles with PAAP authority scoring and cited-source provenance.</span></li>
+                            <li><span class="node file">semantic.py</span><span class="desc">Should provide vector and text retrieval across documents, runs, and evidence. Maps to layer 6 + pgvector/FAISS backend when deployed.</span></li>
+                            <li><span class="node file">profile.py</span><span class="desc">Should hold organization preferences, policies, risk appetite, and user constraints. Extends layer 4 with org-level governance context.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">integrations/ <span class="pill pill-missing">gateway + connectors</span></span>
+                          <span class="desc">Should isolate data access, ingestion, enterprise connectors, and ontology mapping from worker tools.</span>
+                          <ul>
+                            <li><span class="node file">data_gateway.py</span><span class="desc">Should expose query_evidence/search_evidence/list_sources and enforce DSC before retrieval.</span></li>
+                            <li><span class="node folder">connectors/ <span class="note">SQLite, Postgres, files, email, SharePoint, ERP</span></span><span class="desc">Should contain source adapters with consistent evidence envelopes and auth handling.</span></li>
+                            <li><span class="node folder">ingestion/ <span class="note">PDF, Excel, OCR, email, webhook normalization</span></span><span class="desc">Should parse raw enterprise content into normalized, typed, timestamped evidence records.</span></li>
+                            <li><span class="node folder">ontology/ <span class="note">typed business object model</span></span><span class="desc">Should map evidence to business objects such as vendors, contracts, policies, budgets, and risks.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">daemon/ <span class="pill pill-missing">long-running autonomy</span></span>
+                          <span class="desc">Should run background autonomy loops, scheduled checks, notifications, and long-running recovery behavior.</span>
+                          <ul>
+                            <li><span class="node file">heartbeat.py <span class="pill pill-claude">act/wait loop</span></span><span class="desc">Should periodically decide whether a paused or active run needs action, waiting, or recovery.</span></li>
+                            <li><span class="node file">proactive_policy.py</span><span class="desc">Should encode when autonomous work is allowed, useful, too risky, or too expensive.</span></li>
+                            <li><span class="node file">notifications.py</span><span class="desc">Should notify users or systems about blockers, completions, failures, and important autonomous actions.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">bridge/ <span class="pill pill-claude">remote control</span></span>
+                          <span class="desc">Should support authenticated IDE, browser, mobile, or external control of running agent sessions. Claude Code: bridge/ (Claude Desktop bridge) and remote/ (remote mode) are two separate confirmed modules, both JWT-authenticated.</span>
+                          <ul>
+                            <li><span class="node file">auth.py</span><span class="desc">Should manage bridge tokens, session authorization, and remote-control permissions. Claude Code: JWT-based authentication; remote-managed-settings service syncs config remotely.</span></li>
+                            <li><span class="node file">remote.py</span><span class="desc">Should route remote messages, streaming updates, and session handoff between clients. Claude Code: remote/ is separate from bridge/ — handles headless/non-interactive remote mode.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">voice/ <span class="pill pill-claude">Claude pattern</span></span>
+                          <span class="desc">Should handle voice input/output mode. Claude Code: voice/ module + services/voiceStreamSTT.ts + services/voice.ts confirmed. Not core to decision-agent but confirms the runtime surface extensibility — the same agent loop serves multiple I/O modalities.</span>
+                          <ul>
+                            <li><span class="node file">voice_mode.py</span><span class="desc">Should manage voice session state, STT streaming, and voice-specific command routing.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">assistant/ <span class="pill pill-claude">Claude pattern</span></span>
+                          <span class="desc">Should implement a persistent named assistant mode with cross-session continuity. Claude Code: assistant/ module is the KAIROS assistant mode — a persistent identity that can schedule, remember, and act proactively. Directly relevant to decision-agent's long-running governance role.</span>
+                          <ul>
+                            <li><span class="node file">kairos.py</span><span class="desc">Should provide a named, persistent assistant persona with cross-session continuity, proactive scheduling, and autonomous observation-action loops.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">diagnostics/ <span class="pill pill-claude">doctor + parity</span></span>
+                          <span class="desc">Should make runtime health, setup problems, and architecture/code parity visible. Claude Code: /doctor + /debug-tool-call + /heapdump commands all confirmed; diagnosticTracking.ts service for telemetry.</span>
+                          <ul>
+                            <li><span class="node file">doctor.py</span><span class="desc">Should check providers, keys, data gateway, memory indexes, permissions, storage, and model access. Claude Code: /doctor runs environment verification checks.</span></li>
+                            <li><span class="node file">parity.py</span><span class="desc">Should compare architecture promises with implemented modules and produce a parity matrix.</span></li>
+                            <li><span class="node file">debug_tool_call.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should replay and inspect specific tool calls for debugging without re-running the full agent. Claude Code: /debug-tool-call command confirmed.</span></li>
+                            <li><span class="node file">heapdump.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should capture runtime memory/state snapshot for deep diagnosis of stalls or leaks. Claude Code: /heapdump command confirmed.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">services/ <span class="pill pill-missing">cross-cutting services</span></span>
+                          <span class="desc">Should contain reusable product services that are not domain decision logic. Claude Code: services/ layer confirmed at 22 subdirectories including api/, compact/, contextCollapse/, mcp/, oauth/, lsp/, tools/, analytics/.</span>
+                          <ul>
+                            <li><span class="node folder">model_gateway/</span><span class="desc">Should route models by risk, budget, latency, availability, and policy.</span></li>
+                            <li><span class="node folder">compact/ <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should implement the 3 confirmed compaction strategies — reactive (compress on API error), micro (compress message pairs), trimmed (selective history trimming). Claude Code: services/compact/ with autoCompact() triggered reactively or on thresholds.</span></li>
+                            <li><span class="node folder">context_collapse/ <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should collapse large context sections without full compaction. Claude Code: services/contextCollapse/ confirmed module for mid-run context reduction.</span></li>
+                            <li><span class="node folder">mcp/</span><span class="desc">Should manage MCP server discovery, auth, resources, and tools. Claude Code: services/mcp/ + mcpServerApproval.tsx approval UI for user-visible authorization of MCP connections.</span></li>
+                            <li><span class="node folder">oauth/ <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should manage OAuth authentication flows for external services and data connectors. Claude Code: services/oauth/ confirmed.</span></li>
+                            <li><span class="node folder">lsp/ <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should integrate Language Server Protocol for code-aware context, symbol resolution, and completions. Claude Code: services/lsp/ + LSPTool confirmed.</span></li>
+                            <li><span class="node folder">auth/</span><span class="desc">Should centralize user, service, API key, and session authentication.</span></li>
+                            <li><span class="node folder">analytics/ <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should collect product/runtime metrics. Claude Code: dual-layer telemetry confirmed — Anthropic internal + Datadog external; event types for tool use, commands, errors, and cost. 6+ remote killswitches polled hourly via remoteManagedSettings.</span></li>
+                            <li><span class="node file">tool_orchestration.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should manage parallel tool execution and scheduling. Claude Code: services/tools/toolOrchestration.ts + StreamingToolExecutor confirmed for concurrent tool batching.</span></li>
+                            <li><span class="node file">token_estimation.py <span class="pill pill-claude">Claude pattern</span></span><span class="desc">Should estimate token counts before and during API submission. Claude Code: services/tokenEstimation.ts confirmed.</span></li>
+                            <li><span class="node folder">queue/ <span class="pill pill-missing">persistent job queue</span></span><span class="desc">Should provide durable async work dispatch so server restarts do not lose in-flight runs. Target: Redis Streams / SQS / Dapr adapter. Without this, all runs die when the process exits.</span></li>
+                            <li><span class="node folder">events/ <span class="pill pill-missing">internal event bus</span></span><span class="desc">Should provide in-process pub-sub for cross-module event dispatch (run started, worker completed, gate fired). Distinct from the hook bus in runtime/ — this is for decoupling modules, not for observing the agent loop.</span></li>
+                            <li><span class="node folder">cache/ <span class="pill pill-missing">caching layer</span></span><span class="desc">Should cache context assembly, evidence bundles, and rate-limit state. Target: Redis / Memcached. Without this, each worker rebuild is cold.</span></li>
+                            <li><span class="node folder">policy_limits/</span><span class="desc">Should enforce organization limits for models, tools, data, budgets, and actions. Claude Code: rateLimitMessages.ts + claudeAiLimits.ts; 6 confirmed remote killswitches that can disable tools, commands, or entire features.</span></li>
+                            <li><span class="node folder">plugins/</span><span class="desc">Should provide plugin loading as a service for commands, tools, and connectors. Claude Code: services/plugins/ manages install/enable/disable/update lifecycle.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">ui/ <span class="pill pill-missing">runtime screens</span></span>
+                          <span class="desc">Should contain reusable UI components, screens, and renderers for terminal and web surfaces. Claude Code: components/ confirmed at 33 subdirectories, React + Ink for terminal rendering, Zod v4 for schema validation.</span>
+                          <ul>
+                            <li><span class="node folder">components/</span><span class="desc">Should hold reusable UI elements for traces, tasks, costs, prompts, and tool calls.</span></li>
+                            <li><span class="node folder">screens/</span><span class="desc">Should hold full views such as doctor, replay, resume, memory, and live run console.</span></li>
+                            <li><span class="node folder">renderers/</span><span class="desc">Should adapt the same runtime events to terminal, web, and API streaming output.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">state/ <span class="pill pill-missing">application state</span></span>
+                          <span class="desc">Should separate mutable application/session state from immutable audit events. Claude Code: state/ subdirectory confirmed; feature() function used throughout for runtime flags.</span>
+                          <ul>
+                            <li><span class="node file">app_state.py</span><span class="desc">Should hold app-level feature flags, provider state, and runtime health summary. Claude Code: feature() flag system with confirmed flags: REACTIVE_COMPACT, CONTEXT_COLLAPSE, HISTORY_SNIP, BG_SESSIONS, EXPERIMENTAL_SKILL_SEARCH, TEMPLATES.</span></li>
+                            <li><span class="node file">run_state.py</span><span class="desc">Should hold active run cursors, leases, blockers, and current execution phase.</span></li>
+                            <li><span class="node file">session_state.py</span><span class="desc">Should hold interactive session metadata, active transcript, and UI state.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">types/ <span class="pill pill-missing">shared schemas</span></span>
+                          <span class="desc">Should contain typed domain, runtime, tool, command, memory, and event schemas. Claude Code: types/ with TypeScript definitions; Zod v4 for runtime validation at all boundaries.</span>
+                          <ul>
+                            <li><span class="node file">models.py</span><span class="desc">Should define dataclasses or Pydantic models used across runtime packages.</span></li>
+                            <li><span class="node file">schemas.py</span><span class="desc">Should define JSON schemas and validation contracts for external API boundaries.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">plugins/ <span class="pill pill-claude">extension system</span></span>
+                          <span class="desc">Should let external packages contribute commands, tools, skills, connectors, and UI panels safely. Claude Code: plugins/ module confirmed with install/enable/disable/update lifecycle + /plugin command + hook integration.</span>
+                          <ul>
+                            <li><span class="node file">loader.py</span><span class="desc">Should discover and load plugins from configured locations.</span></li>
+                            <li><span class="node file">registry.py</span><span class="desc">Should register plugin-provided capabilities with permissions and versions.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">skills/ <span class="pill pill-claude">reusable workflows</span></span>
+                          <span class="desc">Should contain reusable agent workflows and prompt/tool recipes with argument substitution. Claude Code: skills/ module + SkillTool confirmed; EXPERIMENTAL_SKILL_SEARCH feature flag; built-in skills: commit, review.</span>
+                          <ul>
+                            <li><span class="node file">loader.py</span><span class="desc">Should load built-in and custom skills from markdown or package metadata.</span></li>
+                            <li><span class="node file">executor.py</span><span class="desc">Should run skills inline, forked, or through a subagent depending on risk and scope.</span></li>
+                            <li><span class="node folder">builtin/</span><span class="desc">Should hold built-in workflows such as review, commit, research, explain, and architecture-sync.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">setup/ <span class="pill pill-missing">workspace setup</span></span>
+                          <span class="desc">Should contain first-run setup, environment detection, onboarding, and workspace manifest generation. Claude Code: setup.ts confirmed for first-run initialization.</span>
+                          <ul>
+                            <li><span class="node file">workspace.py</span><span class="desc">Should detect project shape, package managers, tests, data paths, and runtime capabilities.</span></li>
+                            <li><span class="node file">onboarding.py</span><span class="desc">Should guide initial setup for providers, data, permissions, and local persistence.</span></li>
+                            <li><span class="node file">environment.py</span><span class="desc">Should validate OS, shell, dependencies, secrets, and service availability.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">migrations/ <span class="pill pill-missing">schema evolution</span></span>
+                          <span class="desc">Should handle config, data, memory, and run-record upgrades as the platform evolves.</span>
+                          <ul>
+                            <li><span class="node file">config_migrations.py</span><span class="desc">Should migrate old config files and feature flags to new formats.</span></li>
+                            <li><span class="node file">data_migrations.py</span><span class="desc">Should migrate run, memory, evidence, and ontology storage layouts.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">tests/ <span class="pill pill-missing">package-level tests</span></span>
+                          <span class="desc">Should add focused tests next to the runtime packages instead of only broad backend tests.</span>
+                          <ul>
+                            <li><span class="node folder">runtime/</span><span class="desc">Should test query engine, context compilation, hooks, sessions, and all 3 compact strategies.</span></li>
+                            <li><span class="node folder">tools/</span><span class="desc">Should test tool schemas, permissions, execution, and audit output for all 40+ tools.</span></li>
+                            <li><span class="node folder">agents/</span><span class="desc">Should test spawning, task store, subagent isolation, coordinator logic, and team coordination.</span></li>
+                            <li><span class="node folder">memory/</span><span class="desc">Should test all 7 memory layers: scope isolation, persistence, eviction, and autoDream consolidation.</span></li>
+                            <li><span class="node folder">parity/</span><span class="desc">Should test that documented architecture gaps match implemented packages.</span></li>
+                          </ul>
+                        </li>
+                        <li><span class="node folder">modules/ <span class="pill pill-core">keep current decision engine</span></span><span class="desc">Should remain focused on decision architecture, governance, contracts, runs, and domain logic.</span></li>
+                        <li><span class="node folder">shared/ <span class="pill pill-partial">providers, audit, low-level utilities</span></span><span class="desc">Should keep low-level primitives used across packages without becoming a dumping ground.</span></li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+                <li><span class="node folder">public/ <span class="pill pill-partial">upgrade into live console</span></span><span class="desc">Should evolve from static UI into live trace, timeline, blocker, replay, and admin surfaces.</span></li>
+                <li><span class="node folder">.github/ <span class="pill pill-missing">automation</span></span><span class="desc">Should hold CI, release, security scanning, and parity-check workflows.</span></li>
+                <li><span class="node folder">configs/</span><span class="desc">Should hold environment-independent schemas, connector config, model policy, and feature flags.</span></li>
+                <li><span class="node folder">data/</span><span class="desc">Should remain local/dev persistence, while production maps to databases, object storage, and queues.</span></li>
+                <li><span class="node folder">docs/</span><span class="desc">Should contain operational docs, API docs, development guides, and architecture decision records.</span></li>
+                <li><span class="node folder">literature/</span><span class="desc">Should hold research, diagrams, reference architecture comparisons, and design rationale.</span></li>
+                <li><span class="node folder">knowledge/</span><span class="desc">Should become seed knowledge or test fixtures once ingestion and semantic retrieval exist.</span></li>
+                <li><span class="node folder">scripts/</span><span class="desc">Should contain small maintenance, diagnostics, migration, and local development helpers.</span></li>
+                <li><span class="node folder">assets/ <span class="pill pill-missing">product assets</span></span><span class="desc">Should hold screenshots, diagrams, icons, demos, and product-facing visual assets.</span></li>
+                <li><span class="node file">USAGE.md <span class="pill pill-missing">operator guide</span></span><span class="desc">Should document build, auth, CLI/API usage, sessions, diagnostics, and common workflows.</span></li>
+                <li><span class="node file">ROADMAP.md <span class="pill pill-missing">delivery plan</span></span><span class="desc">Should track active architecture milestones, cleanup backlog, and release sequencing.</span></li>
+                <li><span class="node file">PARITY.md <span class="pill pill-claude">parity matrix</span></span><span class="desc">Should compare the target architecture map against implemented folders, APIs, and tests.</span></li>
+                <li><span class="node file">PHILOSOPHY.md <span class="pill pill-missing">design intent</span></span><span class="desc">Should explain the system-design principles behind autonomy, governance, and enterprise use.</span></li>
+                <li><span class="node file">Containerfile <span class="pill pill-missing">deployment</span></span><span class="desc">Should provide a repeatable container-first development and deployment path.</span></li>
+                <li><span class="node file">CLAUDE.md <span class="pill pill-claude">project context</span></span><span class="desc">Should provide agent-facing project instructions, architecture constraints, and safe operating rules.</span></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>

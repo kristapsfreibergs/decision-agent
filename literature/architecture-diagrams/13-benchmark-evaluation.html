@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Benchmark and Thesis Evaluation Flow</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar"><h1>Benchmark and Thesis Evaluation Flow - Current</h1><a class="back" href="index.html">Back to index</a></div>
+      <p>Current benchmark configuration, execution, metric extraction, and findings flow.</p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+flowchart LR
+  Config["configs/benchmarks/*.json"]
+  Fixtures["evaluation/fixtures/*.json"]
+  Runner["evaluation.runner<br/>run_benchmark_sync"]
+  Conditions["Conditions<br/>A0, A, C, F, G_qwen, G_llama"]
+  Runs["data/runs/*"]
+  Metrics["evaluation.metrics<br/>scope, evidence, DAR, audit,<br/>quality, time, cost"]
+  Report["evaluation.report<br/>results.csv, summary.json"]
+  Findings["docs/benchmark-findings*.md"]
+
+  Config --> Runner
+  Fixtures --> Runner
+  Conditions --> Runner
+  Runner --> Runs
+  Runs --> Metrics
+  Metrics --> Report
+  Report --> Findings
+        </pre>
+      </section>
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>

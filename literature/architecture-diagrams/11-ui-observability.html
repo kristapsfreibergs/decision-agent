@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI Observability Architecture</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar"><h1>UI Observability Architecture - Target</h1><a class="back" href="index.html">Back to index</a></div>
+      <p>How the UI should expose run state, audit events, agent activity, and evidence.</p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+flowchart TB
+  Audit["audit.jsonl<br/>source of truth"]
+  State["derive_run_status<br/>derive_worker_statuses<br/>derive_run_timeline"]
+  Dashboard["/api/dashboard"]
+  RunDetail["/api/runs/{id}"]
+  Timeline["/api/runs/{id}/timeline<br/>planned"]
+  UI["Workshop floor UI"]
+  GovUI["Governance cockpit"]
+
+  subgraph Views["Real-time UI surfaces"]
+    Topology["Topology view<br/>phases and dependencies"]
+    EventStream["Event stream<br/>scheduler, worker, tool, validation"]
+    AgentPanel["Agent detail<br/>current task, last event, tools,<br/>errors, evidence, cost"]
+    EvidencePanel["Evidence panel<br/>scope, PAAP records, external inputs"]
+    RuntimePanel["Runtime panel<br/>active, ready, blocked, waiting"]
+  end
+
+  Audit --> State
+  State --> Dashboard
+  State --> RunDetail
+  State --> Timeline
+  Dashboard --> UI
+  RunDetail --> UI
+  RunDetail --> GovUI
+  Timeline --> UI
+  UI --> Topology
+  UI --> EventStream
+  UI --> AgentPanel
+  UI --> EvidencePanel
+  UI --> RuntimePanel
+        </pre>
+      </section>
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>

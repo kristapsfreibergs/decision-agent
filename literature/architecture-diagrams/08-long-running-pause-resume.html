@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Long-Running Pause and Resume</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar"><h1>Long-Running Pause and Resume - Planned V1</h1><a class="back" href="index.html">Back to index</a></div>
+      <p>Explicit pause, external input receipt, and one-shot scheduler resume.</p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Operator
+  actor External as External source
+  participant API as server.py API
+  participant Runs as runs.service
+  participant Exec as runs.executor
+  participant Worker as worker runner
+  participant Tools as external input tools
+  participant Data as data/runs
+
+  Operator->>API: POST /api/runs/{id}/pause
+  API->>Runs: pause_run(reason, waiting_for)
+  Runs->>Data: append run_paused
+  Runs->>Data: append external_input_requested
+  Data-->>API: status waiting_external_input
+
+  External->>API: POST /api/runs/{id}/external-input
+  API->>Runs: receive_external_input(source_id, input_type, content)
+  Runs->>Runs: validate source_id and DSC scope
+  Runs->>Data: write external_inputs/{source_id}.json
+  Runs->>Data: append external_input_received
+  Runs->>Data: append run_resumed
+  API->>Exec: execute_ready_workers() in background
+
+  Exec->>Worker: run evaluator when dependencies ready
+  Worker->>Tools: list_external_inputs()
+  Tools-->>Worker: source list
+  Worker->>Tools: read_external_input(source_id)
+  Tools-->>Worker: source content
+  Worker->>Data: output cites evidence source
+  Worker->>Data: PAAP evidence record written after citation
+        </pre>
+      </section>
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>

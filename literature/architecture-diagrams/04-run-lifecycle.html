@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Run Lifecycle &amp; Runtime Artifacts - Current</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar">
+        <h1>Run Lifecycle &amp; Runtime Artifacts - Current</h1>
+        <a class="back" href="index.html">Back to index</a>
+      </div>
+
+      <h2>Run Lifecycle Sequence</h2>
+      <p>
+        End-to-end flow from task submission through architecture selection, contract
+        generation, worker execution, governance checks, and audit recording.
+        State transitions are derived by replaying <code>audit.jsonl</code> — see
+        <a href="17-c4-diagrams.html">17 — C4 &amp; State Machines</a> for the full state machine.
+      </p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor User
+  participant UI as UI or CLI
+  participant Server as server.py
+  participant Runs as runs.service
+  participant Router as decision router
+  participant Arch as architecture modules
+  participant Contracts as contracts modules
+  participant Sched as scheduler
+  participant Worker as worker runner
+  participant Provider as model provider
+  participant Gov as governance (DSC/PAAP/DAR)
+  participant Data as data/runs
+
+  User->>UI: Submit task
+  UI->>Server: POST /api/runs
+  Server->>Runs: create_run(task)
+  Runs->>Router: classify_decision_type(task)
+  Router-->>Runs: decision_type
+  Runs->>Data: task.json, run-record.json, audit.jsonl
+
+  alt Static architecture exists
+    Runs->>Arch: find_architecture_for_decision()
+    Arch-->>Runs: architecture definition
+    Runs->>Contracts: instantiate and validate contracts
+    Contracts-->>Data: contracts/*.json
+  else Dynamic architecture
+    UI->>Server: POST /architecture/build
+    Server->>Runs: build_architecture_proposal()
+    Runs->>Arch: classify goal, build topology, decompose packages
+    Arch-->>Data: planning-artifact.json, architecture-proposal.json
+    User->>UI: Review and approve architecture
+    UI->>Server: POST /architecture/approve
+    UI->>Server: POST /architecture/generate-contracts
+    Runs->>Contracts: generate contracts from proposal
+    Contracts-->>Data: generated-contracts/*.json
+  end
+
+  UI->>Server: POST /start
+  Server->>Data: append run_started
+  UI->>Server: POST /schedule
+  Server->>Sched: get ready workers by deps + phase gates
+  loop Ready workers
+    Sched->>Worker: run_worker(contract)
+    Worker->>Provider: complete_with_tools(system, messages, tools)
+    Provider-->>Worker: tool_use or final JSON
+    Worker->>Worker: execute bounded tools (read/write/query_sql/memory_search)
+    Worker->>Contracts: schema + contractual output validation
+    Contracts->>Gov: PAAP evidence scoring + DSC scope check
+    Worker->>Gov: DAR receipt for proposed action
+    Worker->>Data: outputs/*.json, evidence/*.json, authorization/*.json, audit
+  end
+
+  alt Human / phase gate required
+    User->>UI: Approve or reject gate
+    UI->>Server: POST gate endpoint
+    Server->>Data: append gate_approved / gate_rejected
+  end
+
+  UI->>Server: GET /api/dashboard
+  Server-->>UI: enriched run state (derived from audit.jsonl replay)
+        </pre>
+      </section>
+
+      <h2>Runtime Artifact Model</h2>
+      <p>
+        Every run writes its complete state to <code>data/runs/{run_id}/</code>.
+        The audit log is the source of truth — all other files are derived outputs.
+        <code>external_inputs/</code> is planned V1 for long-running pause/resume.
+      </p>
+      <section class="diagram-card">
+        <pre class="mermaid">
+flowchart LR
+  RunDir["data/runs/{run_id}/"]
+
+  Task["task.json\noriginal task input"]
+  Record["run-record.json\nlayer_config · provider · context"]
+  Audit["audit.jsonl\nappend-only event log\nsource of truth"]
+
+  Contracts["contracts/*.json\nstatic architecture runs"]
+  Proposal["architecture-proposal.json\ndynamic runs"]
+  Planning["planning-artifact.json"]
+  Generated["generated-contracts/*.json"]
+
+  Outputs["outputs/*.json\nworker structured output"]
+  Scope["scope.json\nDSC scope contract"]
+  Evidence["evidence/*.json\nPAAP scored records"]
+  Auth["authorization/*.json\nDAR receipts"]
+  Checkpoints["checkpoints/*.json\nworker state after each tool call"]
+  External["external_inputs/*.json\nplanned V1 — long-running pause"]
+
+  RunDir --> Task
+  RunDir --> Record
+  RunDir --> Audit
+  RunDir --> Contracts
+  RunDir --> Proposal
+  Proposal --> Planning
+  Proposal --> Generated
+  Generated --> Outputs
+  Generated --> Scope
+  Outputs --> Evidence
+  Outputs --> Auth
+  Audit --> Checkpoints
+  RunDir --> External
+        </pre>
+      </section>
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>
