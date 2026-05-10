@@ -1,0 +1,9 @@
+{
+  "name": "frontier_governed_low",
+  "description": "Compliance-coverage frontier: governed stack at low PAAP strictness (min_avg_score=0.3). Permissive evidence threshold — governance rarely abstains. Expected: high coverage (most runs complete), low unsafe_approvals (DAR still fires), moderate scope violations. Maps to the permissive end of the compliance-coverage frontier (high coverage, moderate compliance). Compare with frontier-governed-high.json and frontier-baseline.json.",
+  "conditions": ["F"],
+  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "reps": 5,
+  "timeout_seconds": 900,
+  "paap_min_avg_score": 0.3
+}

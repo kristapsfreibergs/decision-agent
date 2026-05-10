@@ -1,0 +1,8 @@
+{
+  "name": "procurement_compliance_coverage",
+  "description": "PDF-style setup using current metrics: compare governance compliance against completion/coverage across two procurement fixtures.",
+  "conditions": ["A0", "A", "C", "F"],
+  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "reps": 5,
+  "timeout_seconds": 900
+}

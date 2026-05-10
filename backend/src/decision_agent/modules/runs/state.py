@@ -66,6 +66,12 @@ EVIDENCE_SCORED = "evidence_scored"
 ACTION_PROPOSED = "action_proposed"
 AUTHORIZATION_RECEIPT_RECORDED = "authorization_receipt_recorded"
 
+# observability events
+WORKER_COST = "worker_cost"
+
+# retry events
+WORKER_RETRY_STARTED = "worker_retry_started"
+
 # ---------------------------------------------------------------------------
 # Run statuses (derived)
 # ---------------------------------------------------------------------------

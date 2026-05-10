@@ -15,11 +15,16 @@ from decision_agent.modules.runs.service import (
     read_run,
 )
 from decision_agent.modules.runs.state import (
+    AGENT_STATUS_REJECTED,
+    AGENT_STATUS_FAILED,
     AUTHORIZATION_RECEIPT_RECORDED,
     PHASE_GATE_APPROVED,
     RUN_FAILED,
+    WORKER_ASSIGNED,
 )
 from decision_agent.shared.audit_log import append_audit_event
+
+_MAX_RETRIES_DEFAULT = 2
 
 
 def auto_approve_phase_gates_once(run_id: str, root: Path) -> int:
@@ -138,6 +143,62 @@ def auto_fail_when_blocked(run_id: str, root: Path) -> bool:
     return True
 
 
+def auto_retry_rejected_workers(
+    run_id: str,
+    root: Path,
+    max_retries: int = _MAX_RETRIES_DEFAULT,
+) -> list[str]:
+    """Re-queue rejected workers that have a checkpoint and haven't exceeded max_retries.
+
+    Returns list of worker_ids that were re-queued. The scheduler picks them up
+    on the next loop iteration; run_worker will load the checkpoint automatically.
+
+    Retry counts are tracked via worker_retry_started events in the audit log.
+    A worker that has already been retried max_retries times is not retried again
+    and stays in rejected/failed status.
+    """
+    run = read_run(run_id, root)
+    if not run:
+        return []
+
+    worker_statuses = run.get("worker_statuses", {})
+    audit = run.get("audit", [])
+    audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
+    checkpoints_dir = root / "data" / "runs" / run_id / "checkpoints"
+
+    # Count how many times each worker has been retried so far
+    retry_counts: dict[str, int] = {}
+    for event in audit:
+        if event.get("event") == "worker_retry_started":
+            wid = event.get("worker_id", "")
+            if wid:
+                retry_counts[wid] = retry_counts.get(wid, 0) + 1
+
+    retried: list[str] = []
+    for worker_id, status in worker_statuses.items():
+        if status not in {AGENT_STATUS_REJECTED, AGENT_STATUS_FAILED}:
+            continue
+        if retry_counts.get(worker_id, 0) >= max_retries:
+            continue
+        checkpoint_file = checkpoints_dir / f"{worker_id}.json"
+        if not checkpoint_file.exists():
+            continue
+        # Re-queue by emitting worker_assigned — scheduler sees it as runnable
+        append_audit_event(
+            audit_path,
+            {
+                "event": WORKER_ASSIGNED,
+                "run_id": run_id,
+                "worker_id": worker_id,
+                "retry_attempt": retry_counts.get(worker_id, 0) + 1,
+                "from_checkpoint": True,
+            },
+        )
+        retried.append(worker_id)
+
+    return retried
+
+
 def watch_run_to_completion(
     run_id: str,
     root: Path,
@@ -151,6 +212,7 @@ def watch_run_to_completion(
     """
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
+        auto_retry_rejected_workers(run_id, root)
         auto_approve_phase_gate_when_dar_decided(run_id, root)
         if auto_fail_when_blocked(run_id, root):
             break

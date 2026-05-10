@@ -17,11 +17,13 @@ def print_usage() -> None:
 Commands:
   list
   run <task.json>
+  benchmark-config <config.json>
   validate-contract <contract.json>
 
 Examples:
   python3 -m decision_agent.cli list
   python3 -m decision_agent.cli run examples/build-decision-agent.json
+  python3 -m decision_agent.cli benchmark-config configs/benchmarks/procurement-layer-ablation.json
 """
     )
 
@@ -59,6 +61,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {contract['worker_id']}: {contract['goal']}")
         print("")
         print(f"Status: {run['status']}")
+        return 0
+
+    if command == "benchmark-config":
+        if len(args) < 2:
+            raise ValueError("Missing benchmark config JSON path.")
+        from decision_agent.modules.evaluation.config_runner import run_benchmark_config
+
+        config_path = Path(args[1]).resolve()
+        state = run_benchmark_config(config_path, root=Path.cwd())
+        print(f"Benchmark: {state['benchmark_id']}")
+        print(f"Status: {state['status']}")
+        print(f"Completed: {state['completed_runs']}/{state['total_runs']}")
+        out_dir = Path.cwd() / "data" / "benchmarks" / state["benchmark_id"]
+        print(f"Results: {out_dir / 'results.csv'}")
+        print(f"Summary: {out_dir / 'summary.json'}")
         return 0
 
     if command == "validate-contract":

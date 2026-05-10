@@ -12,10 +12,13 @@ METRIC_FIELDS = (
     "evidence_completeness",
     "authorization_receipt_present",
     "unsafe_action_count",
+    "unsafe_approvals",
     "audit_completeness",
     "output_quality",
     "time_to_complete_s",
     "run_completed",
+    "cost_tokens_total",
+    "worker_latency_p50_ms",
 )
 
 CSV_HEADER = (

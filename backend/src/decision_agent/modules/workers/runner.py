@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,9 @@ from decision_agent.modules.runs.state import (
     EVIDENCE_SCORED,
     VALIDATION_FAILED,
     VALIDATION_PASSED,
+    WORKER_COST,
     WORKER_MESSAGE,
+    WORKER_RETRY_STARTED,
     WORKER_STARTED,
     WORKER_SUBMITTED,
 )
@@ -259,6 +262,41 @@ def _minimum_tool_requirement_met(called_tools: list[str], allowed_tools: list[s
     return bool(called_tools)
 
 
+def _checkpoint_path(project_root: Path, run_id: str, worker_id: str) -> Path:
+    return project_root / "data" / "runs" / run_id / "checkpoints" / f"{worker_id}.json"
+
+
+def _save_checkpoint(
+    project_root: Path, run_id: str, worker_id: str,
+    step: int, messages: list[dict[str, Any]], called_tools: list[str],
+) -> None:
+    cp = _checkpoint_path(project_root, run_id, worker_id)
+    cp.parent.mkdir(parents=True, exist_ok=True)
+    cp.write_text(
+        json.dumps(
+            {"step": step, "messages": messages, "called_tools": called_tools},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _load_checkpoint(
+    project_root: Path, run_id: str, worker_id: str,
+) -> dict[str, Any] | None:
+    cp = _checkpoint_path(project_root, run_id, worker_id)
+    if not cp.exists():
+        return None
+    try:
+        return json.loads(cp.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _clear_checkpoint(project_root: Path, run_id: str, worker_id: str) -> None:
+    _checkpoint_path(project_root, run_id, worker_id).unlink(missing_ok=True)
+
+
 def run_worker(
     run_id: str,
     worker_id: str,
@@ -266,21 +304,27 @@ def run_worker(
     audit_path: Path,
     project_root: Path,
     provider: LLMProvider,
+    *,
+    is_retry: bool = False,
+    retry_attempt: int = 0,
 ) -> dict[str, Any]:
     """
     Execute one worker loop:
-    1. Emit worker_started
-    2. Build prompt from contract + context files
-    3. Call provider
-    4. Emit worker_message with raw response
-    5. Parse + validate JSON
-    6. Emit validation_passed / validation_failed
-    7. Emit worker_submitted with result
+    1. Emit worker_started (or worker_retry_started on retry)
+    2. Load checkpoint if this is a retry and one exists
+    3. Build prompt from contract + context files
+    4. Call provider
+    5. Save checkpoint after each successful tool call
+    6. Parse + validate JSON
+    7. Emit validation_passed / validation_failed
+    8. Emit worker_submitted + worker_cost
     Returns the validated output dict.
     """
     def emit(event: str, **extra: Any) -> None:
         append_audit_event(audit_path, {"event": event, "run_id": run_id, "worker_id": worker_id, **extra})
 
+    if is_retry:
+        emit(WORKER_RETRY_STARTED, attempt=retry_attempt, from_checkpoint=True)
     emit(WORKER_STARTED, provider=provider.name)
 
     context_files = _read_context_files(contract, project_root)
@@ -294,13 +338,28 @@ def run_worker(
         if tool["name"] in allowed_tools
     ]
 
-    messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
+    # Load checkpoint if this is a retry
+    checkpoint = None
+    if is_retry:
+        checkpoint = _load_checkpoint(project_root, run_id, worker_id)
+
+    if checkpoint:
+        messages: list[dict[str, Any]] = checkpoint["messages"]
+        called_tools: list[str] = checkpoint["called_tools"]
+        start_step: int = checkpoint["step"]
+    else:
+        messages = [{"role": "user", "content": user}]
+        called_tools = []
+        start_step = 0
+
     max_steps = contract.get("max_steps", 6)
     raw_response = ""
-    called_tools: list[str] = []
     json_nudge_count = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
+    worker_wall_start = time.monotonic()
 
-    for step in range(max_steps):
+    for step in range(start_step, max_steps):
         # Only force tool use on the very first turn (no tools called yet, no prior tool results).
         # After a tool_result message, Anthropic rejects tool_choice:"any" paired with the result.
         first_turn = len(called_tools) == 0 and len(messages) == 1
@@ -308,12 +367,16 @@ def run_worker(
             called_tools,
             allowed_tools,
         )
+        _call_t0 = time.monotonic()
         response = provider.complete_with_tools(
             system,
             messages,
             active_tool_defs,
             tool_choice={"type": "any"} if force_tool else None,
         )
+        _call_usage = response.get("usage") or {}
+        total_input_tokens += int(_call_usage.get("input_tokens", 0))
+        total_output_tokens += int(_call_usage.get("output_tokens", 0))
         if response["stop_reason"] == "tool_use":
             tool_uses = response.get("tool_uses") or ([response.get("tool_use")] if response.get("tool_use") else [])
             if not tool_uses:
@@ -343,6 +406,7 @@ def run_worker(
                 )
             messages.append({"role": "assistant", "content": response["content"]})
             messages.append({"role": "user", "content": tool_results})
+            _save_checkpoint(project_root, run_id, worker_id, step + 1, messages, called_tools)
             continue
 
         # Skip during nudge recovery — tools already ran, we are steering toward JSON.
@@ -420,12 +484,21 @@ def run_worker(
         raise ValueError(f"Worker {worker_id} failed contractual validation: {'; '.join(contract_issues)}")
 
     output_file = _write_worker_output(project_root, run_id, worker_id, output)
+    _clear_checkpoint(project_root, run_id, worker_id)
     emit(VALIDATION_PASSED)
     emit(
         WORKER_SUBMITTED,
         summary=output.get("summary", ""),
         files_changed=output.get("files_changed", []),
         output_file=output_file,
+    )
+    emit(
+        WORKER_COST,
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=total_output_tokens,
+        total_tokens=total_input_tokens + total_output_tokens,
+        wall_time_ms=int((time.monotonic() - worker_wall_start) * 1000),
+        provider=provider.name,
     )
 
     # DAR: build authorization receipt for workers that declare a dar_action_type.

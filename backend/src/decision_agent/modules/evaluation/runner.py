@@ -152,9 +152,19 @@ def _execute_workers_in_thread(
                 {"event": "worker_assigned", "run_id": run_id, "worker_id": worker_id},
             )
 
-            def _run(wid=worker_id, ct=contract):
+            # Detect if this dispatch is a retry (worker_assigned event has retry metadata)
+            is_retry_dispatch = False
+            retry_attempt_num = 0
+            for evt in reversed(run.get("audit", [])):
+                if evt.get("event") == "worker_assigned" and evt.get("worker_id") == worker_id:
+                    is_retry_dispatch = bool(evt.get("from_checkpoint"))
+                    retry_attempt_num = int(evt.get("retry_attempt", 0))
+                    break
+
+            def _run(wid=worker_id, ct=contract, ir=is_retry_dispatch, ra=retry_attempt_num):
                 try:
-                    run_worker(run_id, wid, ct, audit_path, root, provider)
+                    run_worker(run_id, wid, ct, audit_path, root, provider,
+                               is_retry=ir, retry_attempt=ra)
                 except Exception as exc:
                     append_audit_event(
                         audit_path,
@@ -222,12 +232,39 @@ def _run_plain_model(
     append_audit_event(audit_path, {"event": "gate_approved", "run_id": run_id, "note": "plain_model_auto"})
 
 
+def _apply_evidence_overrides(run_id: str, root: Path, overrides: dict[str, Any]) -> None:
+    """Patch evidence_profile in all generated contracts on disk.
+
+    Called after contract generation when a config specifies evidence_overrides
+    (e.g. paap_min_avg_score). Each run's contracts are independent files so
+    this is thread-safe across concurrent benchmark runs.
+    """
+    contracts_dir = root / "data" / "runs" / run_id / "generated-contracts"
+    if not contracts_dir.exists():
+        return
+    for contract_path in contracts_dir.glob("*.json"):
+        try:
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        profile = contract.get("evidence_profile")
+        if not isinstance(profile, dict):
+            continue
+        profile.update(overrides)
+        contract["evidence_profile"] = profile
+        contract_path.write_text(
+            json.dumps(contract, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+
 def run_one(
     fixture_id: str,
     condition: str,
     rep: int,
     root: Path,
     timeout_seconds: float = 600.0,
+    evidence_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute a single benchmark run end-to-end and return its metrics."""
     layer_config, provider_override = CONDITION_MAP[condition]
@@ -258,16 +295,19 @@ def run_one(
     approve_architecture(run_id, "benchmark_auto", root)
     # 3. generate contracts (with LayerConfig; DSC scope embedded if enabled)
     generate_contracts_for_approved_architecture(run_id, root)
-    # 4. mark run started
+    # 4. apply evidence overrides (e.g. paap_min_avg_score for frontier sweep)
+    if evidence_overrides:
+        _apply_evidence_overrides(run_id, root, evidence_overrides)
+    # 5. mark run started
     start_run(run_id, root)
-    # 5. execute workers
+    # 6. execute workers
     worker_thread = threading.Thread(
         target=_execute_workers_in_thread,
         args=(run_id, root, provider_override, audit_path),
         daemon=True,
     )
     worker_thread.start()
-    # 6. auto-approve phase gates + finalize when ready
+    # 7. auto-approve phase gates + finalize when ready
     watch_run_to_completion(run_id, root, timeout_seconds=timeout_seconds)
     worker_thread.join(timeout=10.0)
 
@@ -347,6 +387,82 @@ def run_benchmark(
 
     threading.Thread(target=_execute, daemon=True).start()
     return benchmark_id
+
+
+def run_benchmark_sync(
+    conditions: list[str],
+    fixtures: list[str],
+    reps: int,
+    root: Path,
+    timeout_seconds: float = 600.0,
+    benchmark_id: str | None = None,
+    evidence_overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run a benchmark synchronously and return the final persisted state.
+
+    This is the config/CLI-friendly companion to run_benchmark(), which is
+    intentionally backgrounded for the local HTTP server. Both paths write the
+    same progress.json/results.csv/summary.json artifact shape.
+    """
+    resolved_id = benchmark_id or (
+        f"bench_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:6]}"
+    )
+    out_dir = root / "data" / "benchmarks" / resolved_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    state: dict[str, Any] = {
+        "benchmark_id": resolved_id,
+        "conditions": conditions,
+        "fixtures": fixtures,
+        "reps": reps,
+        "started_at": datetime.now(timezone.utc).isoformat() + "Z",
+        "status": "running",
+        "completed_runs": 0,
+        "total_runs": len(conditions) * len(fixtures) * reps,
+        "results": [],
+        "errors": [],
+    }
+    _persist_progress(out_dir, state)
+
+    try:
+        for fixture in fixtures:
+            for condition in conditions:
+                for rep in range(reps):
+                    try:
+                        metrics = run_one(
+                            fixture, condition, rep, root, timeout_seconds,
+                            evidence_overrides=evidence_overrides,
+                        )
+                    except Exception as exc:
+                        state["errors"].append(
+                            {
+                                "fixture": fixture,
+                                "condition": condition,
+                                "rep": rep,
+                                "error": str(exc)[:500],
+                            }
+                        )
+                        metrics = {
+                            "condition": condition,
+                            "fixture": fixture,
+                            "rep": rep,
+                            "error": str(exc)[:500],
+                        }
+                    state["results"].append(metrics)
+                    state["completed_runs"] += 1
+                    _persist_progress(out_dir, state)
+        state["status"] = "completed"
+    except Exception as exc:
+        state["status"] = "failed"
+        state["errors"].append({"top_level": str(exc)[:500]})
+    finally:
+        state["finished_at"] = datetime.now(timezone.utc).isoformat() + "Z"
+        _persist_progress(out_dir, state)
+        from decision_agent.modules.evaluation.report import write_csv, write_summary
+        write_csv(state["results"], out_dir / "results.csv")
+        write_summary(state, out_dir / "summary.json")
+
+    return state
 
 
 def _persist_progress(out_dir: Path, state: dict[str, Any]) -> None:

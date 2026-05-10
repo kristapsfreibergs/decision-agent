@@ -1,0 +1,9 @@
+{
+  "name": "procurement_layer_ablation",
+  "description": "Previous experiment setup: same procurement task across plain baseline, architecture-only, validators-only, and full governance.",
+  "conditions": ["A0", "A", "C", "F"],
+  "fixtures": ["procurement_laptops"],
+  "reps": 3,
+  "timeout_seconds": 600
+}
+
