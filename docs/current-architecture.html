@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Decision Agent Structural Architecture</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f7f6f1;
+        color: #171717;
+      }
+
+      header {
+        padding: 18px 24px 10px;
+        border-bottom: 1px solid #d8d4c8;
+        background: #ffffff;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      p {
+        margin: 6px 0 0;
+        color: #555;
+        font-size: 14px;
+      }
+
+      main {
+        padding: 18px;
+      }
+
+      .diagram {
+        overflow: auto;
+        background: #ffffff;
+        border: 1px solid #d8d4c8;
+        border-radius: 6px;
+        padding: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Decision Agent Structural Architecture</h1>
+      <p>C4-style Mermaid container diagram. This is architecture, not runtime flow.</p>
+    </header>
+
+    <main>
+      <div class="diagram">
+        <pre class="mermaid">
+C4Component
+  title Decision Agent - Structural Architecture
+
+  Person(user, "User", "Creates tasks, approves architecture, answers blockers, approves gates")
+
+  System_Ext(plain_llm, "Plain LLM Layer", "A0 baseline: one prompt to one model, no executable harness")
+  System_Ext(anthropic, "Anthropic", "Optional model provider")
+  System_Ext(ollama, "Ollama", "Optional local model provider")
+
+  System_Boundary(decision_agent, "Decision Agent Project") {
+    Container(cli, "CLI", "Python module", "decision_agent.cli: list, run, benchmark-config, validate-contract")
+    Container(workshop_ui, "Workshop Floor UI", "HTML/CSS/Vanilla JS", "Task intake, architecture approval, worker cockpit")
+    Container(governance_ui, "Governance Cockpit", "HTML/CSS/Vanilla JS", "Benchmarks, scope, evidence, authorization, audit inspection")
+
+    Container(server, "Local HTTP Server", "Python http.server", "decision_agent.server: static files plus JSON API")
+
+    Container_Boundary(runtime, "Runtime Core") {
+      Component(run_service, "Run Service", "Python", "Creates and reads runs, proposals, contracts, gates, audit records")
+      Component(state, "State Derivation", "Python", "Derives run and worker status by replaying audit events")
+      Component(scheduler, "Scheduler", "Python", "Finds workers ready by dependency status and phase gates")
+      Component(router, "Decision Router", "Python", "Classifies tasks into decision types")
+      Component(suggestions, "Task Suggestions", "Python", "Previews goal structure, topology, and proposed team")
+    }
+
+    Container_Boundary(architecture, "Architecture Planning") {
+      Component(static_registry, "Static Architecture Registry", "Python", "Registered executable architecture definitions")
+      Component(proposal_builder, "Dynamic Proposal Builder", "Python", "Builds planning artifact and architecture proposal")
+      Component(goal_structure, "Goal Structure", "Python", "Classifies problem shape")
+      Component(topology, "Topology Builder", "Python", "Defines phases, gates, dependencies")
+      Component(decomposers, "Domain Decomposers", "Python", "Software, procurement, story package decomposition")
+      Component(explorers, "Explorer Catalog", "Python", "Adds intake/context-gathering packages")
+    }
+
+    Container_Boundary(contracts, "Executable Contracts") {
+      Component(contract_generator, "Contract Generator", "Python", "Instantiates worker contracts from proposals")
+      Component(contract_validator, "Contract Validator", "Python", "Validates contract shape and forbidden capabilities")
+      Component(output_validator, "Output Validator", "Python", "Validates worker outputs against declared validators")
+    }
+
+    Container_Boundary(governance, "Governance Layers") {
+      Component(layer_config, "Layer Config", "Python", "Enables or disables DSC, PAAP, DAR, human gate, validators")
+      Component(dsc, "DSC", "Python", "Decision scope contracts and scope checks")
+      Component(paap, "PAAP", "Python", "Evidence authority scoring")
+      Component(dar, "DAR", "Python", "Action authorization receipts")
+      Component(human_gates, "Human Gates", "Audit events", "Architecture, phase, and final action approvals")
+    }
+
+    Container_Boundary(worker_runtime, "Worker Runtime") {
+      Component(worker_runner, "Bounded Worker Runner", "Python", "Builds prompts from contracts, invokes providers, validates output")
+      Component(worker_tools, "Worker Tools", "Python", "read_file, write_file, list_files, run_tests, web_search stub")
+      Component(provider_registry, "Provider Registry", "Python", "Selects mock, Anthropic, or Ollama provider")
+      Component(mock_provider, "Mock Provider", "Python", "Local deterministic provider")
+    }
+
+    Container_Boundary(evaluation, "Evaluation") {
+      Component(benchmark_runner, "Benchmark Runner", "Python", "Runs A0/A/C/F/G condition cells")
+      Component(config_runner, "Config Runner", "Python", "Runs benchmark configs")
+      Component(auto_approver, "Auto Approver", "Python", "Approves benchmark gates when rules allow")
+      Component(metrics, "Metrics + Reports", "Python", "Extracts metrics and writes CSV/summary artifacts")
+    }
+
+    ContainerDb(runs_data, "Run Artifacts", "Local JSON/JSONL files", "data/runs: task, run-record, audit, contracts, outputs, scope, evidence, authorization")
+    ContainerDb(benchmark_data, "Benchmark Artifacts", "Local JSON/CSV files", "data/benchmarks: progress, results, summary")
+    ContainerDb(knowledge, "Knowledge Base", "Markdown files", "knowledge/procurement")
+    ContainerDb(configs, "Benchmark Configs", "JSON files", "configs/benchmarks")
+    ContainerDb(examples, "Example Tasks", "JSON files", "examples")
+  }
+
+  Rel(user, workshop_ui, "Uses")
+  Rel(user, governance_ui, "Uses")
+  Rel(user, cli, "Runs commands")
+  Rel(user, plain_llm, "A0 direct prompt baseline")
+
+  Rel(workshop_ui, server, "Calls JSON API")
+  Rel(governance_ui, server, "Calls JSON API")
+  Rel(cli, run_service, "Invokes directly")
+  Rel(cli, config_runner, "Invokes directly")
+  Rel(server, run_service, "Orchestrates runs")
+  Rel(server, suggestions, "Requests task setup previews")
+  Rel(server, scheduler, "Schedules workers")
+  Rel(server, benchmark_runner, "Launches benchmarks")
+
+  Rel(run_service, router, "Classifies task")
+  Rel(run_service, static_registry, "Loads registered architecture")
+  Rel(run_service, proposal_builder, "Builds dynamic architecture")
+  Rel(run_service, contract_generator, "Generates contracts")
+  Rel(run_service, contract_validator, "Validates architecture and contracts")
+  Rel(run_service, dsc, "Creates scope contract when enabled")
+  Rel(run_service, runs_data, "Reads and writes")
+  Rel(run_service, state, "Enriches run state")
+
+  Rel(suggestions, proposal_builder, "Builds preview artifact")
+  Rel(proposal_builder, goal_structure, "Uses")
+  Rel(proposal_builder, topology, "Uses")
+  Rel(proposal_builder, decomposers, "Uses")
+  Rel(proposal_builder, explorers, "Uses")
+  Rel(proposal_builder, provider_registry, "Optional domain classification support")
+
+  Rel(contract_generator, contract_validator, "Validates generated contracts")
+  Rel(contract_generator, runs_data, "Writes generated contracts")
+  Rel(scheduler, runs_data, "Reads audit and outputs")
+  Rel(scheduler, worker_runner, "Starts ready workers")
+  Rel(scheduler, human_gates, "Respects phase gates")
+
+  Rel(worker_runner, provider_registry, "Requests model completion")
+  Rel(worker_runner, worker_tools, "Executes contract-bound tools")
+  Rel(worker_runner, output_validator, "Validates final JSON")
+  Rel(worker_runner, dar, "Records authorization when action proposed")
+  Rel(worker_runner, runs_data, "Writes outputs and audit")
+  Rel(worker_tools, knowledge, "Reads allowed knowledge files")
+  Rel(worker_tools, runs_data, "Reads and writes allowed run files")
+  Rel(output_validator, dsc, "Checks scope")
+  Rel(output_validator, paap, "Scores evidence")
+  Rel(provider_registry, mock_provider, "Uses by default")
+  Rel(provider_registry, anthropic, "Uses when configured")
+  Rel(provider_registry, ollama, "Uses when configured")
+
+  Rel(benchmark_runner, run_service, "Creates governed runs")
+  Rel(benchmark_runner, worker_runner, "Executes benchmark workers")
+  Rel(benchmark_runner, auto_approver, "Auto-drives benchmark gates")
+  Rel(benchmark_runner, metrics, "Extracts results")
+  Rel(benchmark_runner, benchmark_data, "Writes progress and reports")
+  Rel(config_runner, configs, "Reads")
+  Rel(config_runner, benchmark_runner, "Runs benchmark suite")
+  Rel(benchmark_runner, examples, "Uses fixtures/tasks")
+        </pre>
+      </div>
+    </main>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        securityLevel: "loose",
+        themeVariables: {
+          primaryColor: "#ffffff",
+          primaryTextColor: "#171717",
+          primaryBorderColor: "#8f887a",
+          lineColor: "#57534a",
+          secondaryColor: "#f7f6f1",
+          tertiaryColor: "#eef4ff",
+          fontFamily: "ui-sans-serif, system-ui, sans-serif"
+        }
+      });
+    </script>
+  </body>
+</html>
