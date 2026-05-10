@@ -9,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.retry import with_retry
 
 
 class OllamaProvider(LLMProvider):
@@ -41,15 +42,17 @@ class OllamaProvider(LLMProvider):
             data=body,
             headers={"Content-Type": "application/json"},
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self._timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
-        except urllib.error.URLError as exc:
-            raise RuntimeError(
-                f"OllamaProvider could not reach {url}: {exc}. "
-                "Is `ollama serve` running?"
-            ) from exc
-        return json.loads(raw)
+        def _do_request() -> dict[str, Any]:
+            try:
+                with urllib.request.urlopen(request, timeout=self._timeout_seconds) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.URLError as exc:
+                raise RuntimeError(
+                    f"OllamaProvider could not reach {url}: {exc}. "
+                    "Is `ollama serve` running?"
+                ) from exc
+
+        return with_retry(_do_request)
 
     def complete(self, system: str, user: str, *, max_tokens: int = 4096) -> str:
         payload = {
@@ -128,6 +131,10 @@ class OllamaProvider(LLMProvider):
                     "tool_use": tool_uses[0],
                     "tool_uses": tool_uses,
                     "tool_capable": True,
+                    "usage": {
+                        "input_tokens": 0,  # Ollama /api/chat doesn't report prompt tokens
+                        "output_tokens": data.get("eval_count", 0),
+                    },
                 }
 
         return {
@@ -135,6 +142,10 @@ class OllamaProvider(LLMProvider):
             "content": text,
             "tool_use": None,
             "tool_capable": True,
+            "usage": {
+                "input_tokens": 0,
+                "output_tokens": data.get("eval_count", 0),
+            },
         }
 
 

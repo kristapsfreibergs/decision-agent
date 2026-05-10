@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.retry import with_retry
 
 
 class AnthropicProvider(LLMProvider):
@@ -61,7 +62,7 @@ class AnthropicProvider(LLMProvider):
                 "anthropic package is not installed. Run: pip install anthropic"
             ) from exc
 
-        client = anthropic.Anthropic(api_key=self._api_key, timeout=self._timeout, max_retries=1)
+        client = anthropic.Anthropic(api_key=self._api_key, timeout=self._timeout, max_retries=0)
         request: dict = {
             "model": self._model,
             "max_tokens": max_tokens,
@@ -72,7 +73,7 @@ class AnthropicProvider(LLMProvider):
         if tool_choice is not None:
             request["tool_choice"] = tool_choice
 
-        response = client.messages.create(**request)
+        response = with_retry(lambda: client.messages.create(**request))
         if response.stop_reason == "tool_use":
             tool_blocks = [block for block in response.content if block.type == "tool_use"]
             tool_uses = [
@@ -89,10 +90,23 @@ class AnthropicProvider(LLMProvider):
                 "tool_use": tool_uses[0] if tool_uses else None,
                 "tool_uses": tool_uses,
                 "tool_capable": True,
+                "usage": {
+                    "input_tokens": getattr(response.usage, "input_tokens", 0),
+                    "output_tokens": getattr(response.usage, "output_tokens", 0),
+                },
             }
 
         text = next((block.text for block in response.content if hasattr(block, "text")), "")
-        return {"stop_reason": "end_turn", "content": text, "tool_use": None, "tool_capable": True}
+        return {
+            "stop_reason": "end_turn",
+            "content": text,
+            "tool_use": None,
+            "tool_capable": True,
+            "usage": {
+                "input_tokens": getattr(response.usage, "input_tokens", 0),
+                "output_tokens": getattr(response.usage, "output_tokens", 0),
+            },
+        }
 
 
 def _content_block_to_dict(block: object) -> dict:
