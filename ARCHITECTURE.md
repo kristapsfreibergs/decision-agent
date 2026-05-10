@@ -146,7 +146,8 @@ WORKER EXECUTION
   worker runner ──────────  system prompt builder · tool loop · JSON parser
                             JSON-nudge recovery · max_steps enforcement
   tool provider ───────────  read_file · write_file · list_files · run_tests
-                             web_search (stub) · query_sql (planned)
+                             web_search (stub) · query_sql (built) · memory_search (built)
+                             list_external_inputs · read_external_input (built)
   output validator ────────  schema validation → DSC check → PAAP scoring → DAR trigger
 
 GOVERNANCE KERNEL  [deterministic — no LLM in path]
@@ -163,39 +164,61 @@ GOVERNANCE KERNEL  [deterministic — no LLM in path]
   LayerConfig ─────  toggle each layer per run (dsc · paap · dar · human_gate)
                      stored in run-record.json, threaded through all governance calls
 
-RETRIEVAL LAYER  [partially built — ingestion connectors are next]
-  MemoryProvider interface ─  search(query, scope) → list[MemoryHit]
-                               scope is required — structurally enforces DSC boundary
-  FilesystemMemory ─────────  knowledge/ folders read at run creation (built)
-  SQLRetrieval ─────────────  query_sql tool → rows annotated with evidence_class
-                              + timestamp from schema-map.json config (planned)
-  FileRetrieval ────────────  Drive / SharePoint / S3 → annotated documents (planned)
-  ExternalToolRetrieval ────  Wrike / Jira / CRM → reference_check evidence (planned)
-  EvidenceBundleAssembler ──  pre-fetch all required evidence before workers start,
-                              score with PAAP, lock as scoped context (planned)
-  SchemaMapper ─────────────  config: table/path → evidence_class + authority weight
-                              companies.contracts → signed_contract (1.00)
-                              vendor_mgmt.rankings → compliance_rule (0.95)
-                              (planned)
+DATA GATEWAY  [agents never connect to data sources directly]
+  Rule: no worker ever holds a DB connection string, API key, or file path
+        beyond what the gateway exposes as an annotated evidence excerpt.
+  SchemaMapper ─────────  configs/data-sources/schema-map.json (built)
+                          table/folder/API → evidence_class + authority weight
+                          vendor_mgmt.proposals → vendor_proposal (0.70)
+                          compliance.certifications → compliance_rule (0.95)
+  query_sql tool ────────  workers call query_sql(table, filters) (built)
+                          gateway checks allowed_tables (DSC), runs query,
+                          annotates each row: evidence_class + timestamp + excerpt
+                          agents see excerpts, never credentials
+  web_fetch tool ─────── planned: governed HTTP GET through SandboxPolicy
+  FileRetrieval ─────────  Drive / SharePoint / S3 → annotated documents (planned)
+  ExternalToolRetrieval ─  Wrike / Jira / CRM → reference_check evidence (planned)
+
+RETRIEVAL LAYER
+  MemoryProvider ────────  search(query, scope) → list[MemoryHit]
+                           scope is required — structurally enforces DSC boundary
+  FilesystemMemory ──────  knowledge/ + data/memory/ (built — keyword search)
+  VectorMemory ──────────  pgvector / FAISS (planned — semantic search)
+  ObsidianMemory ─────────  human-edited markdown vault (planned)
+  EvidenceBundleAssembler   pre-fetch evidence at run creation, score with PAAP,
+                            lock into run context — workers get snapshot (planned)
+  memory_search tool ────  workers call memory_search(query) (built)
+                           returns past run evidence within DSC scope
 
 MODEL PROVIDERS  [behind provider seam — kernel never imports directly]
-  AnthropicProvider ───  claude-sonnet-4-6  (built)
+  AnthropicProvider ───  claude-sonnet-4-6 (built)
   OllamaProvider ──────  qwen2.5 · llama3.1 via local Ollama (built)
+  LocalModelProvider ───  llamacpp / MLX / MLC — on-device, never leaves phone (planned)
   MockProvider ────────  deterministic test output (built)
+  FallbackProvider ────  primary → fallback chain on failure (built)
 
 AUDIT + STORAGE
   audit.jsonl ─────────  append-only event log — complete run replay from this alone
   run-record.json ─────  layer_config · provider_override · benchmark_mode
+                         execution_context · connectivity · time_model  ← new
   scope.json ──────────  DSC scope contract for the run
   evidence/*.json ─────  PAAP scored records per worker
   authorization/*.json ─  DAR receipts per action
   outputs/*.json ───────  worker structured outputs
+  checkpoints/*.json ───  worker state after each tool call — enables retry from last step
+  external_inputs/*.json  evidence received from outside during long-running pause
   data/benchmarks/ ─────  benchmark results · CSV · summary.json · claim_check
 ```
 
 ---
 
-### Retrieval layer — detailed (built and planned)
+### Data gateway + retrieval layer — detailed
+
+**Design rule: agents never connect to data sources directly.**
+Every data access goes through the Data Gateway. Workers call tools (`query_sql`,
+`web_fetch`, `memory_search`). The gateway enforces DSC scope, annotates every result
+with evidence class and authority weight, and logs every access in the audit trail.
+Credentials never reach the agent.
 
 ```
 COMPANY INFORMATION SYSTEMS
@@ -206,51 +229,100 @@ COMPANY INFORMATION SYSTEMS
 └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  └────────┬──────────┘
          │                    │                      │                     │
          └────────────────────┴──────────────────────┴─────────────────────┘
-                                         │
+                                         │  raw data (credentials stay here)
                               ┌──────────▼──────────────────────────────────┐
-                              │  INGESTION / CONNECTOR LAYER                │
+                              │  DATA GATEWAY  (agents never bypass this)   │
                               │                                             │
                               │  Schema mapper                              │
-                              │  table/folder/API → evidence_class          │
-                              │  contracts.signed_agreements → signed_contract (1.00) │
-                              │  vendor_mgmt.rankings → compliance_rule (0.95) │
-                              │  vendor_mgmt.proposals → vendor_proposal (0.70) │
-                              │  market_intel.benchmarks → market_benchmark (0.65) │
-                              │  jira.closed_tickets → reference_check (0.60) │
-                              │  unstructured_notes → analyst_estimate (0.40) │
+                              │    contracts.signed_agreements → signed_contract 1.00 │
+                              │    vendor_mgmt.rankings   → compliance_rule 0.95 │
+                              │    vendor_mgmt.proposals  → vendor_proposal 0.70 │
+                              │    market_intel.benchmarks→ market_benchmark 0.65│
+                              │    jira.closed_tickets    → reference_check 0.60 │
+                              │    unstructured_notes     → analyst_estimate 0.40│
                               │                                             │
-                              │  Annotator: attaches evidence_class         │
-                              │             + timestamp (from source)       │
-                              │             + source_id (table.pk / path)   │
-                              │             + excerpt (first N chars)       │
+                              │  Semantic layer (column descriptions)       │
+                              │    unit_price_eur → "per-unit EUR excl VAT" │
+                              │    iso27001_certified → "cert on file"     │
+                              │                                             │
+                              │  Access control                             │
+                              │    allowed_tables from DSC contract scope   │
+                              │    read-only: agents cannot mutate data    │
+                              │    every query logged: run_id + worker_id  │
+                              │    credentials in vault, never reach agents│
+                              │                                             │
+                              │  Annotator (stamps every row with PAAP)    │
+                              │    evidence_class · authority · timestamp   │
+                              │    source_id · excerpt                     │
                               └──────────┬──────────────────────────────────┘
                                          │ annotated EvidenceSource objects
                               ┌──────────▼──────────────────────────────────┐
-                              │  EVIDENCE BUNDLE ASSEMBLER                  │
+                              │  EVIDENCE BUNDLE ASSEMBLER  (planned)       │
                               │                                             │
                               │  At run creation: fetch all required        │
-                              │  evidence matching DSC scope               │
-                              │  Score with PAAP (deterministic)           │
-                              │  Lock into run context                     │
-                              │  Workers get bundle — no live DB at        │
-                              │  inference time → reproducible             │
+                              │  evidence via gateway, PAAP-score each,    │
+                              │  snapshot locked at run_created timestamp  │
+                              │  Workers read snapshot — reproducible      │
                               └──────────┬──────────────────────────────────┘
-                                         │ scoped, scored evidence bundle
+                                         │ scoped, scored, timestamped bundle
                               ┌──────────▼──────────────────────────────────┐
                               │  MEMORY PROVIDER                           │
                               │  search(query, scope: DecisionScope)       │
-                              │  scope is required — cannot retrieve       │
-                              │  outside the decision boundary             │
+                              │  scope is required — DSC boundary enforced │
                               │                                             │
-                              │  FilesystemMemory ── knowledge/ (built)   │
+                              │  FilesystemMemory ── knowledge/ + past runs│
+                              │                      keyword search (built) │
                               │  VectorMemory ─────── pgvector / FAISS     │
-                              │                       semantic search in   │
-                              │                       the evidence bundle  │
+                              │                       semantic (planned)   │
+                              │  ObsidianMemory ────── human vault (planned)│
                               └──────────┬──────────────────────────────────┘
-                                         │ MemoryHit (text + evidence_class + score)
+                                         │ MemoryHit (excerpt + evidence_class + score)
                                          ▼
-                              Worker system prompt + context files
+                              Worker system prompt + context bundle
 ```
+
+---
+
+### Unified task model — four runtime configurations
+
+A task is a navigation problem in decision space. The governance kernel, worker
+contracts, and audit trail are **identical across all configurations**. What varies
+is where compute runs, how evidence arrives, and when gates fire.
+
+```
+Task schema (three new fields unify all deployment contexts)
+──────────────────────────────────────────────────────────────────
+  execution_context:  "cloud"    | "mobile"         | "edge"
+  connectivity:       "always_on"| "offline_first"  | "intermittent"
+  time_model:         "sync"     | "async"          | "long_running"
+
+Configuration map
+──────────────────────────────────────────────────────────────────
+                 Cloud/online    Long-running    Mobile/local    Robotics (future)
+                 ────────────    ────────────    ────────────    ─────────────────
+execution_ctx    cloud           cloud           mobile          edge
+connectivity     always_on       intermittent    offline_first   always_on
+time_model       sync            long_running    sync            continuous
+how belief       DB query /      webhook /       grant approved  sensor stream
+updates          API call        email           / web_fetch
+human gate       web UI click    async notif.    phone swipe     real-time override
+evidence         live query      snapshot +      SandboxPolicy   sensor bundle
+arrives          at runtime      external input  grants
+──────────────────────────────────────────────────────────────────
+
+These four configurations share:
+  - same worker contracts (read_paths / write_paths / allowed_tools / validators)
+  - same governance kernel (DSC · PAAP · DAR · LayerConfig)
+  - same audit.jsonl format (complete replay from this file in any context)
+  - same evidence authority weights
+  - same human gate semantics (gate_approved event before final action)
+```
+
+The thesis claim extended: not just "architecture defines behavior" but
+**"the same architecture works across execution contexts without changing the
+governance rules."** A worker contract written for a cloud procurement run is
+executable on a phone with a local model and offline-first evidence — identical
+constraints, identical audit trail, identical governance outcome.
 
 ---
 
@@ -260,11 +332,13 @@ COMPANY INFORMATION SYSTEMS
 1. TASK INTAKE
    CLI / UI → task JSON
    decision_router → decision_type = "procurement"
+   task carries: execution_context · connectivity · time_model
 
 2. ARCHITECTURE
    procurement domain → funnel topology
    3 parallel intake workers → evaluator → recommender
-   contracts generated with: scope_contract, evidence_profile, layer_config
+   contracts generated with: scope_contract · evidence_profile · layer_config
+                              allowed_tables · dar_action_type
 
 3. EVIDENCE BUNDLE (planned: pre-flight; current: workers read at runtime)
    schema mapper → fetch from DB/files matching DSC scope
@@ -292,11 +366,21 @@ COMPANY INFORMATION SYSTEMS
 7. HUMAN GATE
    human reviews: scope · evidence scores · DAR receipt · recommendation brief
    approves or rejects → gate_approved event
-   run_completed
+   on approval: evidence indexed to cross-run memory → run_completed
 
-8. AUDIT
+8. LONG-RUNNING VARIANT (time_model = "long_running")
+   if evidence insufficient at step 3 or 5:
+     operator calls POST /api/runs/:id/pause
+     run.status → waiting_external_input
+   when vendor submits proposal / legal approves / webhook fires:
+     POST /api/runs/:id/external-input → evidence bundle updated
+     run.status → running → evaluator resumes with new evidence
+   full timeline: started 2026-05-01 · paused 2026-05-02 · resumed 2026-05-10 · approved 2026-05-11
+
+9. AUDIT
    audit.jsonl: complete replay of every decision, tool call, governance event
    scope.json · evidence/*.json · authorization/*.json · outputs/*.json
+   external_inputs/*.json · checkpoints/*.json (worker retry state)
    CSV + summary.json for benchmark comparison
 ```
 
@@ -473,11 +557,13 @@ LAYER                   COMPONENT                           STATUS   NOTES
                         Prompt injection guards             ✗        malicious task input can manipulate workers
                         Rate limiting on API                ✗        no protection on endpoints
 
-6. DATA GATEWAY  [new layer — no direct agent→DB connection]
-                        Direct DB connection (query_sql)    ~        built but wrong: direct sqlite connection
-                        Semantic data gateway               ✗        NO direct DB access by agents. Gateway only.
-                        Variable/column descriptions        ✗        columns need business meaning, not just names
-                        Business glossary                   ✗        "unit_price_eur" = per-unit EUR excl VAT
+6. DATA GATEWAY  [partially built — schema mapper exists; full gateway not yet]
+                        Schema mapper (configs/schema-map.json) ✓   table → evidence_class + authority
+                        query_sql tool with allowed_tables check ✓  enforces DSC scope at query seam
+                        demo.db (SQLite) + real connector seam  ✓   SQLite built; PostgreSQL driver planned
+                        Semantic data gateway (no direct conn)  ✗   agents still hold direct sqlite reference
+                        Variable/column descriptions            ✗   columns need business meaning, not just names
+                        Business glossary                       ✗   "unit_price_eur" = per-unit EUR excl VAT
                         Schema evolution handling           ✗        new column → update gateway, not workers
                         Row-level security                  ✗        Project A cannot see Project B's budget
                         Credential isolation                ✗        agents never see DB passwords (vault only)

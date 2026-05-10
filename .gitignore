@@ -8,7 +8,6 @@ data/runs/
 data/outcomes.jsonl
 npm-debug.log*
 .env
-literature/
 .tmp/
 .claude/
 .run_logs/
