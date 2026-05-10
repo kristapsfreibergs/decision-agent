@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import shlex
+import sqlite3
 import subprocess
 from pathlib import Path
 from typing import Any, Callable
@@ -54,6 +56,56 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {"query": {"type": "string"}},
             "required": ["query"],
+        },
+    },
+    {
+        "name": "memory_search",
+        "description": (
+            "Search past decision runs for relevant evidence within the current scope. "
+            "Returns evidence items from previous completed runs that match the query. "
+            "Useful for: past vendor assessments, prior procurement outcomes, "
+            "historical risk decisions. All results are scoped to the current domain."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Keywords to search for in past run evidence.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default 10).",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "query_sql",
+        "description": (
+            "Query a table declared in configs/data-sources/schema-map.json. "
+            "Returns rows annotated as evidence sources (id, type, excerpt, created_at). "
+            "The table must be in the contract's allowed_tables field. "
+            "Use filters to narrow the result set. Maximum 20 rows returned."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "table": {
+                    "type": "string",
+                    "description": "Fully qualified table name as in schema-map, e.g. 'vendor_mgmt.proposals'",
+                },
+                "filters": {
+                    "type": "object",
+                    "description": "Optional key=value pairs for WHERE clause (equality only). e.g. {\"iso27001_certified\": 1}",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum rows to return (default 20, max 20).",
+                },
+            },
+            "required": ["table"],
         },
     },
 ]
@@ -132,7 +184,161 @@ def execute_tool(
             "Call list_files to discover available files, then read_file to access them."
         )
 
+    if name == "memory_search":
+        return _execute_memory_search(params, contract, project_root, audit_emit)
+
+    if name == "query_sql":
+        return _execute_query_sql(params, contract, project_root, audit_emit)
+
     return f"ERROR: unknown tool '{name}'"
+
+
+def _execute_memory_search(
+    params: dict[str, Any],
+    contract: dict[str, Any],
+    project_root: Path,
+    audit_emit: AuditEmit,
+) -> str:
+    query = str(params.get("query", "")).strip()
+    limit = min(int(params.get("limit") or 10), 20)
+    if not query:
+        return "ERROR: memory_search requires a non-empty query."
+
+    scope_dict = contract.get("scope_contract") or {}
+
+    try:
+        from decision_agent.shared.memory.registry import get_memory_provider
+    except ImportError:
+        return "ERROR: memory provider not available."
+
+    provider = get_memory_provider(project_root / "data")
+    hits = provider.search(query, scope_dict, limit=limit)
+    audit_emit("tool_called", tool="memory_search", query=query, hits=len(hits))
+
+    if not hits:
+        return (
+            f"No past evidence found for query '{query}' within scope. "
+            "This may be the first run for this domain."
+        )
+
+    results = [
+        {
+            "id": h.memory_id,
+            "type": h.evidence_class,
+            "excerpt": h.excerpt,
+            "created_at": h.created_at,
+            "authority_score": h.authority_score,
+            "relevance_score": h.relevance_score,
+            "source_run": h.source_run_id,
+            "source_worker": h.worker_id,
+        }
+        for h in hits
+    ]
+    return json.dumps(results, indent=2, ensure_ascii=False)
+
+
+_SCHEMA_MAP_CACHE: dict[str, Any] | None = None
+
+
+def _load_schema_map(project_root: Path) -> dict[str, Any]:
+    global _SCHEMA_MAP_CACHE
+    if _SCHEMA_MAP_CACHE is not None:
+        return _SCHEMA_MAP_CACHE
+    path = project_root / "configs" / "data-sources" / "schema-map.json"
+    if not path.exists():
+        return {}
+    try:
+        _SCHEMA_MAP_CACHE = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        _SCHEMA_MAP_CACHE = {}
+    return _SCHEMA_MAP_CACHE
+
+
+def _execute_query_sql(
+    params: dict[str, Any],
+    contract: dict[str, Any],
+    project_root: Path,
+    audit_emit: AuditEmit,
+) -> str:
+    table = str(params.get("table", "")).strip()
+    filters: dict[str, Any] = params.get("filters") or {}
+    limit = min(int(params.get("limit") or 20), 20)
+
+    # DSC enforcement: table must be in contract's allowed_tables
+    allowed_tables: list[str] = contract.get("allowed_tables") or []
+    if allowed_tables and table not in allowed_tables:
+        audit_emit("tool_called", tool="query_sql", table=table, blocked=True,
+                   reason="not in allowed_tables")
+        return f"ERROR: table '{table}' is not in the contract's allowed_tables: {allowed_tables}"
+
+    schema_map = _load_schema_map(project_root)
+    tables = schema_map.get("tables", {})
+    if table not in tables:
+        audit_emit("tool_called", tool="query_sql", table=table, blocked=True,
+                   reason="not in schema-map")
+        return (
+            f"ERROR: table '{table}' is not in schema-map.json. "
+            f"Available tables: {sorted(tables.keys())}"
+        )
+
+    table_def = tables[table]
+    conn_name = table_def["connection"]
+    connections = schema_map.get("connections", {})
+    conn_def = connections.get(conn_name, {})
+
+    evidence_class = table_def["evidence_class"]
+    timestamp_col = table_def.get("timestamp_col")
+    excerpt_cols: list[str] = table_def.get("excerpt_cols", [])
+    pk_col: str = table_def.get("pk_col", "rowid")
+
+    # Build query — only equality filters, no injection risk
+    where_parts: list[str] = []
+    where_values: list[Any] = []
+    for col, val in filters.items():
+        # Allow alphanumeric + underscore column names only (guards against injection)
+        if col and all(c.isalnum() or c == "_" for c in col):
+            where_parts.append(f'"{col}" = ?')
+            where_values.append(val)
+
+    sql = f'SELECT * FROM "{table}"'
+    if where_parts:
+        sql += " WHERE " + " AND ".join(where_parts)
+    sql += f" LIMIT {limit}"
+
+    try:
+        if conn_def.get("type") == "sqlite":
+            db_path = project_root / conn_def.get("path", "data/demo.db")
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, where_values).fetchall()
+            conn.close()
+        else:
+            return f"ERROR: connection type '{conn_def.get('type')}' not yet supported."
+    except (sqlite3.Error, OSError) as exc:
+        audit_emit("tool_called", tool="query_sql", table=table, error=str(exc)[:200])
+        return f"ERROR: query failed: {exc}"
+
+    # Annotate rows as evidence sources
+    evidence_sources = []
+    for row in rows:
+        row_dict = dict(row)
+        pk_value = row_dict.get(pk_col, "unknown")
+        excerpt_parts = [
+            f"{col}={row_dict[col]}"
+            for col in excerpt_cols
+            if col in row_dict and row_dict[col] is not None
+        ]
+        evidence_sources.append({
+            "id": f"{table}#{pk_value}",
+            "type": evidence_class,
+            "excerpt": "; ".join(excerpt_parts),
+            "created_at": str(row_dict.get(timestamp_col, "")) if timestamp_col else None,
+            "_row": row_dict,
+        })
+
+    audit_emit("tool_called", tool="query_sql", table=table,
+               rows=len(evidence_sources), evidence_class=evidence_class)
+    return json.dumps(evidence_sources, indent=2, ensure_ascii=False, default=str)
 
 
 def _run_tests(command: str, project_root: Path) -> subprocess.CompletedProcess[str]:

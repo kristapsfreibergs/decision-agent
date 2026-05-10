@@ -264,6 +264,7 @@ def artifact_to_proposal(artifact: dict[str, Any], run: dict[str, Any]) -> dict[
                 "completion_contract": package["completion_contract"],
                 "dar_action_type": package.get("dar_action_type"),
                 "dar_consequence_class": package.get("dar_consequence_class"),
+                "allowed_tables": deepcopy(package.get("allowed_tables") or []),
             }
         )
 

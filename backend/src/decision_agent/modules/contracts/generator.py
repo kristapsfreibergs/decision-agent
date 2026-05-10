@@ -76,6 +76,7 @@ def instantiate_generated_contract(
         "layer_config": cfg.to_dict(),
         "dar_action_type": worker.get("dar_action_type"),
         "dar_consequence_class": worker.get("dar_consequence_class"),
+        "allowed_tables": deepcopy(worker.get("allowed_tables") or []),
         "completion_contract": worker["completion_contract"],
         "generated_from": "architecture-proposal.json",
     }

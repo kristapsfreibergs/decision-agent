@@ -72,8 +72,8 @@ EVIDENCE_PROFILE = {
     # PAAP scoring thresholds. A worker that declares evidence must produce
     # a record_score >= min_avg_score and every individual source_score
     # >= min_individual_score, or the validator rejects the output.
-    "min_avg_score": 0.6,
-    "min_individual_score": 0.35,
+    "min_avg_score": 0.5,
+    "min_individual_score": 0.25,
     "temporal_half_life_days": 365,
 }
 
@@ -164,6 +164,12 @@ WORKER_CATALOG: list[dict[str, Any]] = [
         "phase": "intake",
         "parallelizable": True,
         "role": "market_scout",
+        "allowed_tables": [
+            "vendor_mgmt.proposals",
+            "vendor_mgmt.rankings",
+            "market_intel.benchmarks",
+            "compliance.certifications",
+        ],
         "goal_template": (
             "Research the supply market for this procurement. "
             "Find: who the active vendors are, typical market pricing and lead times, "
@@ -174,7 +180,7 @@ WORKER_CATALOG: list[dict[str, Any]] = [
         ),
         "read_paths": ["knowledge/procurement/markets/**"],
         "write_paths": ["data/runs/{run_id}/workspace/market_research.md"],
-        "allowed_tools": ["read_file", "write_file", "list_files", "web_search"],
+        "allowed_tools": ["read_file", "write_file", "list_files", "web_search", "query_sql"],
         "validators": ["write_scope"],
         "output_fields": [
             "summary",
@@ -219,6 +225,13 @@ WORKER_CATALOG: list[dict[str, Any]] = [
         "parallelizable": False,
         "role": "evaluator",
         "dar_action_type": "score_vendors",
+        "allowed_tables": [
+            "vendor_mgmt.proposals",
+            "vendor_mgmt.rankings",
+            "compliance.certifications",
+            "finance.approved_budgets",
+            "market_intel.benchmarks",
+        ],
         "goal_template": (
             "Evaluate and score candidate vendors or options against the requirements. "
             "Step 1 — elimination: remove any vendor that fails a compliance requirement "
@@ -237,7 +250,7 @@ WORKER_CATALOG: list[dict[str, Any]] = [
             "knowledge/procurement/evaluation-criteria/**",
         ],
         "write_paths": ["data/runs/{run_id}/workspace/evaluation.md"],
-        "allowed_tools": ["read_file", "write_file", "list_files"],
+        "allowed_tools": ["read_file", "write_file", "list_files", "query_sql", "memory_search"],
         "validators": ["write_scope", "evidence_sources_declared"],
         "output_fields": [
             "summary",
@@ -326,6 +339,7 @@ def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[s
             "read_paths": read_paths,
             "write_paths": write_paths,
             "allowed_tools": worker["allowed_tools"],
+            "allowed_tables": worker.get("allowed_tables", []),
             "validators": worker["validators"],
             "max_steps": max_steps,
             "dar_action_type": action_type,

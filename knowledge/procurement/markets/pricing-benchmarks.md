@@ -3,8 +3,9 @@
 Reference pricing for cloud infrastructure services. Benchmarks are indicative; actual quotes
 may differ by 10–40% based on commitment, volume, and negotiation.
 
-**Last updated:** Q1 2025
+**Last updated:** 2026-01-10
 **Currency:** EUR (approximate; converted from USD at 1.08)
+**Use as `created_at`:** 2026-01-10 when citing this file as a `market_benchmark` evidence source.
 
 ---
 

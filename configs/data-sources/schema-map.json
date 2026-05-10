@@ -1,0 +1,60 @@
+{
+  "_comment": "Schema mapper: maps DB table names to evidence classes and authority weights. Workers call query_sql(table, filters) and receive rows annotated with evidence_class and created_at. The tool provider enforces that the requested table is both in this map and in the contract's allowed_tables field.",
+  "connections": {
+    "company_db": {
+      "type": "sqlite",
+      "path": "data/demo.db",
+      "_comment": "For PostgreSQL: type=postgresql, host=..., port=5432, dbname=..., user=..., password_env=DB_PASSWORD"
+    }
+  },
+  "tables": {
+    "contracts.signed_agreements": {
+      "connection": "company_db",
+      "evidence_class": "signed_contract",
+      "authority_weight": 1.00,
+      "timestamp_col": "signed_date",
+      "excerpt_cols": ["vendor_name", "contract_value_eur", "scope_summary"],
+      "pk_col": "agreement_id"
+    },
+    "vendor_mgmt.rankings": {
+      "connection": "company_db",
+      "evidence_class": "compliance_rule",
+      "authority_weight": 0.95,
+      "timestamp_col": "updated_at",
+      "excerpt_cols": ["vendor_name", "overall_score", "compliance_status", "ranking_reason"],
+      "pk_col": "ranking_id"
+    },
+    "vendor_mgmt.proposals": {
+      "connection": "company_db",
+      "evidence_class": "vendor_proposal",
+      "authority_weight": 0.70,
+      "timestamp_col": "submitted_at",
+      "excerpt_cols": ["vendor_name", "unit_price_eur", "delivery_weeks", "iso27001_certified", "gdpr_dpa_available"],
+      "pk_col": "proposal_id"
+    },
+    "finance.approved_budgets": {
+      "connection": "company_db",
+      "evidence_class": "budget_approval",
+      "authority_weight": 0.90,
+      "timestamp_col": "approved_at",
+      "excerpt_cols": ["cost_centre", "budget_ceiling_eur", "approver_name", "fiscal_year"],
+      "pk_col": "budget_id"
+    },
+    "market_intel.benchmarks": {
+      "connection": "company_db",
+      "evidence_class": "market_benchmark",
+      "authority_weight": 0.65,
+      "timestamp_col": "published_date",
+      "excerpt_cols": ["category", "median_price_eur", "price_range_low_eur", "price_range_high_eur", "source"],
+      "pk_col": "benchmark_id"
+    },
+    "compliance.certifications": {
+      "connection": "company_db",
+      "evidence_class": "compliance_rule",
+      "authority_weight": 0.95,
+      "timestamp_col": "valid_until",
+      "excerpt_cols": ["vendor_name", "certification_type", "certifying_body", "certificate_number", "valid_until"],
+      "pk_col": "cert_id"
+    }
+  }
+}

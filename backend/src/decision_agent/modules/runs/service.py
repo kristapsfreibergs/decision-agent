@@ -445,8 +445,59 @@ def gate_approve(run_id: str, note: str, root: Path) -> dict[str, Any]:
         audit_path,
         {"event": "gate_approved", "run_id": run_id, "note": note},
     )
+    # Index evidence from completed run into cross-run memory
+    _index_run_to_memory(run_id, run_dir, run, root)
     run = _load_run(run_dir)
     return run
+
+
+def _index_run_to_memory(
+    run_id: str,
+    run_dir: Path,
+    run: dict[str, Any],
+    root: Path,
+) -> None:
+    """Write validated worker evidence into cross-run memory after gate approval.
+
+    Only validated workers are indexed — rejected/failed workers are excluded.
+    This makes past run evidence searchable by future workers via memory_search.
+    """
+    try:
+        from decision_agent.shared.memory.base import MemoryItem
+        from decision_agent.shared.memory.registry import get_memory_provider
+    except ImportError:
+        return
+
+    domain = run.get("decision_type", "generic")
+    worker_statuses = run.get("worker_statuses", {})
+    outputs = _read_outputs(run_dir)
+    provider = get_memory_provider(root / "data")
+
+    for worker_id, output in outputs.items():
+        if worker_statuses.get(worker_id) not in {"validated", "submitted"}:
+            continue
+        sources = output.get("evidence_sources") or []
+        for source in sources:
+            if isinstance(source, dict):
+                src_type = source.get("type", "")
+                excerpt = source.get("excerpt", "") or str(source)[:300]
+                created_at = source.get("created_at", "")
+            elif isinstance(source, str):
+                src_type = source
+                excerpt = source
+                created_at = ""
+            else:
+                continue
+            if not src_type:
+                continue
+            provider.write(MemoryItem(
+                source_run_id=run_id,
+                worker_id=worker_id,
+                evidence_class=src_type,
+                content=excerpt,
+                created_at=created_at,
+                domain=domain,
+            ))
 
 
 def gate_reject(run_id: str, reason: str, root: Path) -> dict[str, Any]:
