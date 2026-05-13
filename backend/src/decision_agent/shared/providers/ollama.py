@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -10,18 +9,10 @@ from uuid import uuid4
 
 from decision_agent.shared.providers.base import LLMProvider
 from decision_agent.shared.providers.retry import with_retry
+from decision_agent.shared.providers.ollama_tools import _extract_json_envelopes, _to_ollama_messages, _to_ollama_tools
 
 
 class OllamaProvider(LLMProvider):
-    """Calls a local Ollama server via stdlib HTTP.
-
-    Default endpoint: http://127.0.0.1:11434. Reads OLLAMA_HOST and OLLAMA_MODEL
-    env vars as fallbacks. Tools are translated into Ollama's function-calling
-    schema; responses are translated back into the internal Anthropic-shaped
-    contract used by the runner. Falls back to a JSON-envelope parser when the
-    model emits tool calls as plain text instead of using tool_calls.
-    """
-
     def __init__(self, model: str | None = None, host: str | None = None) -> None:
         self._model = model or os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")
         host_value = host or os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
@@ -132,7 +123,7 @@ class OllamaProvider(LLMProvider):
                     "tool_uses": tool_uses,
                     "tool_capable": True,
                     "usage": {
-                        "input_tokens": 0,  # Ollama /api/chat doesn't report prompt tokens
+                        "input_tokens": 0,
                         "output_tokens": data.get("eval_count", 0),
                     },
                 }
@@ -148,136 +139,3 @@ class OllamaProvider(LLMProvider):
             },
         }
 
-
-def _to_ollama_tools(tools: list[dict]) -> list[dict]:
-    converted = []
-    for tool in tools:
-        converted.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": tool["name"],
-                    "description": tool.get("description", ""),
-                    "parameters": tool.get("input_schema") or {
-                        "type": "object",
-                        "properties": {},
-                    },
-                },
-            }
-        )
-    return converted
-
-
-def _to_ollama_messages(system: str, messages: list[dict]) -> list[dict]:
-    """Translate the runner's Anthropic-style message list into Ollama format.
-
-    The runner appends:
-      - {"role": "assistant", "content": [<content_blocks with text/tool_use>]}
-      - {"role": "user", "content": [{"type":"tool_result","tool_use_id":...,"content":...}]}
-
-    Ollama wants:
-      - {"role": "assistant", "content": "<text>", "tool_calls": [...]}
-      - {"role": "tool", "content": "<result>"}
-    """
-    out: list[dict] = [{"role": "system", "content": system}]
-    for message in messages:
-        role = message.get("role", "user")
-        content = message.get("content")
-        if isinstance(content, str):
-            out.append({"role": role, "content": content})
-            continue
-        if not isinstance(content, list):
-            continue
-
-        text_parts: list[str] = []
-        tool_calls: list[dict] = []
-        for block in content:
-            if not isinstance(block, dict):
-                continue
-            btype = block.get("type")
-            if btype == "text":
-                text_parts.append(block.get("text", ""))
-            elif btype == "tool_use":
-                tool_calls.append(
-                    {
-                        "function": {
-                            "name": block.get("name", ""),
-                            "arguments": block.get("input") or {},
-                        }
-                    }
-                )
-            elif btype == "tool_result":
-                out.append(
-                    {
-                        "role": "tool",
-                        "content": str(block.get("content") or ""),
-                    }
-                )
-        if text_parts or tool_calls:
-            msg: dict[str, Any] = {
-                "role": role if role in {"assistant", "user"} else "assistant",
-                "content": "\n".join(text_parts),
-            }
-            if tool_calls:
-                msg["tool_calls"] = tool_calls
-            out.append(msg)
-    return out
-
-
-def _extract_json_envelopes(text: str, allowed_names: set[str]) -> list[dict]:
-    """Parse `{"tool":"<name>","input":{...}}` envelopes a small model may emit.
-
-    Used as a fallback when the model returns tool-call intent in plain text
-    instead of using the tool_calls API. Only envelopes naming an allowed tool
-    are kept; other JSON is ignored. Handles nested braces via balanced scan.
-    """
-    if not text:
-        return []
-    calls: list[dict] = []
-    i = 0
-    n = len(text)
-    while i < n:
-        if text[i] != "{":
-            i += 1
-            continue
-        depth = 0
-        in_string = False
-        escape_next = False
-        end = -1
-        for j in range(i, n):
-            ch = text[j]
-            if escape_next:
-                escape_next = False
-                continue
-            if ch == "\\" and in_string:
-                escape_next = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    end = j
-                    break
-        if end == -1:
-            break
-        snippet = text[i:end + 1]
-        try:
-            data = json.loads(snippet)
-        except json.JSONDecodeError:
-            i += 1
-            continue
-        i = end + 1
-        if not isinstance(data, dict):
-            continue
-        name = data.get("tool")
-        if not isinstance(name, str) or name not in allowed_names:
-            continue
-        arguments = data.get("input") if isinstance(data.get("input"), dict) else {}
-        calls.append({"function": {"name": name, "arguments": arguments}})
-    return calls

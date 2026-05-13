@@ -11,7 +11,7 @@
     "writes_must_be_audited": true
   },
   "desired_outputs": [
-    "ARCHITECTURE.md",
+    "archive/docs/ARCHITECTURE.md",
     "architecture registry",
     "decision router",
     "worker contract validator",

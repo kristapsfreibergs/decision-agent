@@ -3,7 +3,7 @@
   "connections": {
     "company_db": {
       "type": "sqlite",
-      "path": "data/demo.db",
+      "path": "archive/data/demo.db",
       "_comment": "For PostgreSQL: type=postgresql, host=..., port=5432, dbname=..., user=..., password_env=DB_PASSWORD"
     }
   },

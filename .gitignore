@@ -14,3 +14,4 @@ npm-debug.log*
 data/benchmarks/
 data/demo.db
 data/memory/
+archive/
