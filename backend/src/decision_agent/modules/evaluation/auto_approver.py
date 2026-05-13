@@ -28,17 +28,12 @@ _MAX_RETRIES_DEFAULT = 2
 
 
 def auto_approve_phase_gates_once(run_id: str, root: Path) -> int:
-    """Append phase_gate_approved events for any topology gate not yet cleared.
-
-    Designed for benchmark mode where humans don't click. Returns the number
-    of phase gates approved this call.
-    """
     run = read_run(run_id, root)
     if not run:
         return 0
     cfg = LayerConfig.from_dict(run.get("layer_config"))
     if not cfg.human_gate_enabled:
-        return 0  # phase gates are inert when human gate layer is off
+        return 0
     proposal = run.get("architecture_proposal") or {}
     topology = proposal.get("topology") or {}
     gates = topology.get("gates") or []
@@ -70,11 +65,6 @@ def auto_approve_phase_gates_once(run_id: str, root: Path) -> int:
 
 
 def auto_approve_phase_gate_when_dar_decided(run_id: str, root: Path) -> int:
-    """Approve a phase gate ONLY after DAR has issued a non-DENY receipt.
-
-    Used in conditions where human_gate is on but the benchmark must proceed
-    automatically. We wait for DAR to weigh in before clicking approve.
-    """
     run = read_run(run_id, root)
     if not run:
         return 0
@@ -93,12 +83,6 @@ def auto_approve_phase_gate_when_dar_decided(run_id: str, root: Path) -> int:
 
 
 def auto_finalize_when_complete(run_id: str, root: Path) -> bool:
-    """If the run's workers are all terminal and no gate_approved yet, click it.
-
-    Honors DAR: gate_approve already enforces that an ALLOW/ESCALATE receipt
-    must exist when dar_enabled. If not, we leave the run in pending state
-    and the metric `run_completed` will surface the failure.
-    """
     run = read_run(run_id, root)
     if not run:
         return False
@@ -118,7 +102,6 @@ def auto_finalize_when_complete(run_id: str, root: Path) -> bool:
 
 
 def auto_fail_when_blocked(run_id: str, root: Path) -> bool:
-    """Fail benchmark runs when no worker can proceed after a dependency failure."""
     run = read_run(run_id, root)
     if not run:
         return False
@@ -148,15 +131,6 @@ def auto_retry_rejected_workers(
     root: Path,
     max_retries: int = _MAX_RETRIES_DEFAULT,
 ) -> list[str]:
-    """Re-queue rejected workers that have a checkpoint and haven't exceeded max_retries.
-
-    Returns list of worker_ids that were re-queued. The scheduler picks them up
-    on the next loop iteration; run_worker will load the checkpoint automatically.
-
-    Retry counts are tracked via worker_retry_started events in the audit log.
-    A worker that has already been retried max_retries times is not retried again
-    and stays in rejected/failed status.
-    """
     run = read_run(run_id, root)
     if not run:
         return []
@@ -166,7 +140,6 @@ def auto_retry_rejected_workers(
     audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
     checkpoints_dir = root / "data" / "runs" / run_id / "checkpoints"
 
-    # Count how many times each worker has been retried so far
     retry_counts: dict[str, int] = {}
     for event in audit:
         if event.get("event") == "worker_retry_started":
@@ -183,7 +156,6 @@ def auto_retry_rejected_workers(
         checkpoint_file = checkpoints_dir / f"{worker_id}.json"
         if not checkpoint_file.exists():
             continue
-        # Re-queue by emitting worker_assigned — scheduler sees it as runnable
         append_audit_event(
             audit_path,
             {
@@ -205,11 +177,6 @@ def watch_run_to_completion(
     timeout_seconds: float,
     poll_interval: float = 0.5,
 ) -> dict[str, Any]:
-    """Block until the run terminates (success, failure, or timeout).
-
-    On every poll: try to clear pending phase gates and finalize the run if
-    workers are done. Returns the final run record.
-    """
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
         auto_retry_rejected_workers(run_id, root)
