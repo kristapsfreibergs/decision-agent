@@ -19,7 +19,7 @@ class Settings:
 
     @property
     def public_dir(self) -> Path:
-        return self.root / "public"
+        return self.root / "archive" / "public"
 
 
 def get_settings(root: Path | None = None) -> Settings:
@@ -51,4 +51,3 @@ def load_env_file(path: Path) -> None:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
         os.environ.setdefault(key, value)
-
