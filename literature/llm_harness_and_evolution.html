@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LLM Harness Necessity & Multimodal Evolution — 2025</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300..700;1,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="design/styles/tokens.css"/>
+<link rel="stylesheet" href="design/styles/base.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { padding: 32px 20px; }
+  .page { max-width: 1240px; padding: 40px 40px 80px; }
+  .mermaid svg { max-width: 100%; }
+
+  /* Paper citation pill */
+  .paper-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+  .paper {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 10px;
+    padding: 8px 12px;
+    border-left: 2px solid var(--rule-4);
+    font-family: var(--font-sans);
+    font-size: var(--fs-11);
+  }
+  .paper:hover { border-left-color: var(--c-blue); background: var(--paper-2); }
+  .paper .ref  { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+  .paper .find { color: var(--ink-2); }
+  .paper .find b { color: var(--ink); }
+
+  @media print { body { padding: 0; } .page { max-width: 100%; } }
+</style>
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    background:            '#FBF9F4',
+    primaryColor:          '#E2EAF1',
+    primaryTextColor:      '#111111',
+    primaryBorderColor:    '#1F4E79',
+    lineColor:             '#4A4A48',
+    secondaryColor:        '#DCE9E6',
+    tertiaryColor:         '#F4F0E6',
+    fontFamily:            'Inter, Helvetica Neue, Arial, sans-serif',
+    fontSize:              '13px',
+    edgeLabelBackground:   '#FBF9F4',
+    clusterBkg:            '#F4F0E6',
+    clusterBorder:         '#8A8780',
+    titleColor:            '#111111',
+    actorBkg:              '#E2EAF1',
+    actorBorder:           '#1F4E79',
+    actorTextColor:        '#111111',
+    activationBkgColor:    '#DCE9E6',
+    activationBorderColor: '#2F7F76',
+    noteBkgColor:          '#F1E3D2',
+    noteBorderColor:       '#B5651D',
+    noteTextColor:         '#111111',
+    signalColor:           '#4A4A48',
+    signalTextColor:       '#111111',
+  }
+});
+</script>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════════════════════
+       PART I — WHY LLMs FAIL WITHOUT A HARNESS
+       ══════════════════════════════════════════════════ -->
+
+  <div class="section" style="border-top:none;padding-top:0;margin-top:0;">
+    <p class="eyebrow">Part I · Research-Backed · 2025</p>
+    <h1 class="h1">Why a Bare LLM<br>Is Not Enough</h1>
+    <p class="lede">Seven empirically measured failure modes of raw LLMs — each traced to a peer-reviewed finding — and the harness components that address them.</p>
+  </div>
+
+  <!-- Fig 1: Failure Modes Map -->
+  <div class="section">
+    <p class="h3">Fig 1 — Failure Modes of a Bare LLM</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 1</span>
+        <span>Raw LLM Failure Modes — Empirical Evidence</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#EFD9DC',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#A23E48',
+  'lineColor': '#4A4A48', 'secondaryColor': '#F1E3D2',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '12px'
+}}}%%
+flowchart TB
+    LLM(["Bare LLM\n— raw forward pass —"])
+
+    F1["HALLUCINATION\n35–60% factual error rate\nLi et al., EMNLP 2023\nHaluEval · arXiv:2305.11747"]
+
+    F2["KNOWLEDGE CUTOFF\nEffective cutoff earlier than reported\nDated Data · arXiv:2403.12958\nrecency bias in training data"]
+
+    F3["LOST IN THE MIDDLE\n20–30% accuracy drop\nwhen evidence is mid-context\nLiu et al., TACL 2024 · arXiv:2307.03172"]
+
+    F4["NO PERSISTENT MEMORY\nStateless across sessions\nContext resets every turn\nMemGPT · Packer et al., 2023\narXiv:2310.08560"]
+
+    F5["CANNOT USE TOOLS\nNo API calls, no search,\nno code execution\nReAct · Yao et al., ICLR 2023\narXiv:2210.03629"]
+
+    F6["WEAK MULTI-STEP REASONING\nFails complex tasks\nwithout explicit prompting\nWei et al., NeurIPS 2022\narXiv:2201.11903"]
+
+    F7["NON-DETERMINISM\n±15% accuracy at temperature=0\neven with identical inputs\narXiv:2408.04667 · ACL 2025"]
+
+    LLM --> F1
+    LLM --> F2
+    LLM --> F3
+    LLM --> F4
+    LLM --> F5
+    LLM --> F6
+    LLM --> F7
+
+    style LLM fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style F1  fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F2  fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F3  fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F4  fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F5  fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F6  fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F7  fill:#EFD9DC,stroke:#A23E48,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 1</span>
+        <span class="text"><b>Seven empirically measured failure modes of a bare LLM.</b> Every node cites a peer-reviewed finding. The hallucination rate (35–60%) from HaluEval (Li et al., 2023) is measured on QA, dialogue, and summarisation tasks. The 20–30% mid-context accuracy drop from Liu et al. (2024) holds across GPT-3.5, GPT-4, LLaMA, and Claude. MemGPT (Packer et al., 2023) demonstrates that without external memory the model cannot maintain coherent state across a long session. ReAct (Yao et al., 2023) shows that tool use requires explicit reasoning-action scaffolding — the model alone cannot call APIs. The ±15% non-determinism finding (ACL 2025) means raw outputs are unreliable even at temperature zero.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fig 2: Harness Solutions -->
+  <div class="section">
+    <p class="h3">Fig 2 — Harness Solutions Map</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 2</span>
+        <span>Each Failure Mode → Its Harness Fix</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#DCE9E6',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#2F7F76',
+  'lineColor': '#4A4A48', 'secondaryColor': '#E2EAF1',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '12px'
+}}}%%
+flowchart LR
+    subgraph FAIL["Failure Mode"]
+        F1["Hallucination"]
+        F2["Knowledge Cutoff"]
+        F3["Lost in the Middle"]
+        F4["No Memory"]
+        F5["No Tools"]
+        F6["Weak Reasoning"]
+        F7["Non-Determinism"]
+    end
+
+    subgraph FIX["Harness Component"]
+        H1["RAG Pipeline\nLewis et al., NeurIPS 2020\nRetriever grounds each response\nto source documents"]
+        H2["Live Retrieval\nReal-time web search · APIs\nGemini Search · Bing · Tavily"]
+        H3["Context Management\nSemantic chunking · sliding window\nSelf-RAG · Asai et al., ICLR 2024"]
+        H4["External Memory\nVector store · episodic DB\nRedis · Qdrant · MemGPT OS"]
+        H5["Tool Orchestration\nFunction calling · agent loop\nReAct + LangGraph + vLLM"]
+        H6["Structured Prompting\nChain-of-thought · Tree-of-Thought\nWei et al. 2022 · Yao et al. 2023"]
+        H7["Sampling Control\nEnsemble voting · self-consistency\nWang et al., ICLR 2023"]
+    end
+
+    F1 -->|grounded generation| H1
+    F2 -->|up-to-date knowledge| H2
+    F3 -->|selective retrieval| H3
+    F4 -->|persistent state| H4
+    F5 -->|tool scaffolding| H5
+    F6 -->|explicit reasoning| H6
+    F7 -->|output consistency| H7
+
+    style H1 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style H2 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style H3 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style H4 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style H5 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style H6 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style H7 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style F1 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F2 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F3 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F4 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F5 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F6 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style F7 fill:#EFD9DC,stroke:#A23E48,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 2</span>
+        <span class="text"><b>Harness components and their corresponding failure modes.</b> RAG (Lewis et al., NeurIPS 2020) is the primary fix for hallucination — grounding each response to retrieved source passages reduces fabrication measurably. Self-RAG (Asai et al., ICLR 2024) extends this with adaptive retrieval, avoiding unnecessary lookups. Self-consistency sampling (Wang et al., ICLR 2023) addresses non-determinism by sampling multiple reasoning paths and majority-voting the answer. Together these components form the minimum viable harness for a production LLM system.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       PART II — LLMs ARE NOT JUST TRANSFORMERS
+       ══════════════════════════════════════════════════ -->
+
+  <div class="section">
+    <p class="eyebrow">Part II · Research-Backed · 2025</p>
+    <h1 class="h1">LLMs Are No Longer<br>Just Transformers</h1>
+    <p class="lede">Modern frontier models have absorbed multimodality, tool use, search, code execution, and computer control natively — capabilities that once required external scaffolding are now inside the model itself.</p>
+  </div>
+
+  <!-- Fig 3: Evolution Timeline -->
+  <div class="section">
+    <p class="h3">Fig 3 — Architectural Evolution</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 3</span>
+        <span>From Transformer to Native Multimodal Agent — 2017 → 2025</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#E2EAF1',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#1F4E79',
+  'lineColor': '#4A4A48', 'secondaryColor': '#DCE9E6',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '12px'
+}}}%%
+flowchart LR
+    T1["TRANSFORMER\nVaswani et al.\nNeurIPS 2017\n—\nText → Text\nFixed N layers\nNo memory, no tools\nNo modalities"]
+
+    T2["GPT-3\nBrown et al.\nNeurIPS 2020\n—\nText only · 175B\nFew-shot prompting\nExternal tools via\nmanual scaffolding"]
+
+    T3["FLAMINGO\nAlayrac et al.\nNeurIPS 2022\n—\nFirst major multimodal\nText + Images interleaved\nFrozen LM + vision encoder\nFew-shot multimodal"]
+
+    T4["GPT-4 + LLaVA\n2023\n—\nVision + Text\nNative function calling\nJSON schema tool use\nLLaVA open-source VLM\narXiv:2304.08485"]
+
+    T5["GPT-4o · Gemini 1.5\n2024\n—\nNative audio+vision+text\nEnd-to-end trained\n1M token context window\nBuilt-in code interpreter\narXiv:2403.05530"]
+
+    T6["Gemini 2.0\nClaude 3.5+\n2024–2025\n—\nNative Google Search\nComputer use · 14.9% OSWorld\nImage generation built-in\nNative agentic planning"]
+
+    T1 -->|"scale + data"| T2
+    T2 -->|"add vision encoder\nFlamingo bridge"| T3
+    T3 -->|"joint training\ninstruction tuning"| T4
+    T4 -->|"end-to-end\nomni training"| T5
+    T5 -->|"native tools\ncomputer control"| T6
+
+    style T1 fill:#F4F0E6,stroke:#8A8780,color:#111111
+    style T2 fill:#E9E3D2,stroke:#4A4A48,color:#111111
+    style T3 fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style T4 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style T5 fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style T6 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 3</span>
+        <span class="text"><b>Architectural evolution from transformer to native multimodal agent.</b> Flamingo (Alayrac et al., NeurIPS 2022) was the first model to natively bridge a frozen language model with a vision encoder — enabling few-shot image-text tasks without external pipelines. GPT-4 (OpenAI, 2023) added native function calling with structured JSON schemas, internalising what ReAct achieved through prompting. GPT-4o (2024) trained natively end-to-end across text, audio, and vision — not stacked encoders but a single omni model. Gemini 1.5 (arXiv:2403.05530) extended the native context to 1M tokens, processing full codebases and hour-long videos in one pass. Claude 3.5 Sonnet's computer use (Anthropic, 2024) scores 14.9% on OSWorld, performing real GUI interactions from screenshots natively.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fig 4: Native Capabilities Map -->
+  <div class="section">
+    <p class="h3">Fig 4 — What Modern LLMs Have Built In</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 4</span>
+        <span>Native Capabilities — No External Scaffolding Required</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#DCE9E6',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#2F7F76',
+  'lineColor': '#4A4A48', 'secondaryColor': '#E2EAF1',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '12px'
+}}}%%
+flowchart TB
+    CORE(["Modern LLM\nGPT-4o · Gemini 2.0\nClaude 3.5 · LLaVA-Next"])
+
+    subgraph MODAL["Native Multimodality"]
+        M1["Text · Images · Audio · Video\nFlamingo · NeurIPS 2022\nGPT-4 Technical Report 2023\narXiv:2303.08774"]
+        M2["Visual Instruction Following\nLLaVA · Liu et al.\nNeurIPS 2023 Oral\narXiv:2304.08485"]
+    end
+
+    subgraph TOOLS["Native Tool Use"]
+        T1["Function Calling\nStructured JSON schema\nOpenAI · Anthropic · Google\nno prompt hacking needed"]
+        T2["Self-taught Tool Invocation\nToolformer · Schick et al.\nNeurIPS 2023 · arXiv:2302.04761\nmodel learns when to call tools"]
+    end
+
+    subgraph CODE["Native Code Execution"]
+        C1["Python Sandbox\nCode Interpreter · OpenAI\nE2B · Built-in execution\nno external runtime setup"]
+    end
+
+    subgraph SEARCH["Native Search Grounding"]
+        S1["Gemini + Google Search\nAuto search query generation\nAI Overviews · 2024\nno RAG pipeline needed"]
+        S2["Claude Web Search\nAnthropic · 2024\nnative retrieval integration"]
+    end
+
+    subgraph CONTROL["Native Computer Control"]
+        K1["Computer Use\nClaude 3.5 Sonnet · Oct 2024\n14.9% OSWorld benchmark\nmouse · keyboard · screenshots"]
+    end
+
+    subgraph CONTEXT["Extended Native Context"]
+        X1["1M Token Context\nGemini 1.5 · arXiv:2403.05530\n1hr video · 11hr audio\n30K+ lines of code — one pass"]
+    end
+
+    subgraph AGENT["Native Agentic Planning"]
+        A1["Multi-step Reasoning\nChain-of-Thought internalized\nExtended thinking · Claude 4\nno external CoT scaffolding"]
+    end
+
+    CORE --> MODAL
+    CORE --> TOOLS
+    CORE --> CODE
+    CORE --> SEARCH
+    CORE --> CONTROL
+    CORE --> CONTEXT
+    CORE --> AGENT
+
+    style CORE fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style M1 fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style M2 fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style T1 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style T2 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style C1 fill:#F1E3D2,stroke:#B5651D,color:#111111
+    style S1 fill:#E5E8D4,stroke:#6E7B3B,color:#111111
+    style S2 fill:#E5E8D4,stroke:#6E7B3B,color:#111111
+    style K1 fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style X1 fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style A1 fill:#DCE9E6,stroke:#2F7F76,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 4</span>
+        <span class="text"><b>Native capabilities of modern frontier LLMs — no external scaffolding required.</b> Each node represents a capability that previously required an external harness but is now built into the model. Toolformer (Schick et al., NeurIPS 2023) demonstrated that models can be trained to decide when and how to call tools through self-supervised learning — without rule-based scaffolding. Gemini 1.5 (arXiv:2403.05530) processes 1M tokens natively, negating the need for external chunking/RAG for many tasks. Claude 3.5 computer use (Anthropic, 2024) performs real GUI interactions from screenshots — what previously required a RPA framework is now a native model output. The key implication: the boundary between <em>model</em> and <em>harness</em> is dissolving.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fig 5: The Convergence — Harness Absorbed Into Model -->
+  <div class="section">
+    <p class="h3">Fig 5 — The Convergence</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 5</span>
+        <span>Harness Components Being Absorbed Into the Model Over Time</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#E2EAF1',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#1F4E79',
+  'lineColor': '#4A4A48', 'secondaryColor': '#DCE9E6',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '12px'
+}}}%%
+flowchart LR
+    subgraph ERA1["2020–2022 — External Everything"]
+        direction TB
+        E_LLM["LLM\nText only"]
+        E_H["External Harness\nRAG · Tools · Memory\nChunking · Routing\nContext mgmt"]
+        E_LLM -. needs .-> E_H
+    end
+
+    subgraph ERA2["2023 — Partial Internalization"]
+        direction TB
+        M_LLM["LLM\n+ Vision\n+ Function calling"]
+        M_H["Still External\nRAG · Memory\nComplex orchestration"]
+        M_LLM -. partially needs .-> M_H
+    end
+
+    subgraph ERA3["2024–2025 — Built-in Harness"]
+        direction TB
+        N_LLM["LLM\n+ Native multimodality\n+ Built-in tool calling\n+ Code execution\n+ Search grounding\n+ 1M context\n+ Computer use\n+ Agentic planning"]
+        N_H["Remaining External\nDomain-specific RAG\nCustom tool APIs\nEnterprise memory"]
+        N_LLM -. optionally augments .-> N_H
+    end
+
+    ERA1 -->|"scale + RLHF\n+ instruction tuning"| ERA2
+    ERA2 -->|"end-to-end multimodal\n+ native tool training"| ERA3
+
+    style E_LLM fill:#F4F0E6,stroke:#4A4A48,color:#111111
+    style E_H   fill:#EFD9DC,stroke:#A23E48,color:#111111
+    style M_LLM fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style M_H   fill:#F1E3D2,stroke:#B5651D,color:#111111
+    style N_LLM fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style N_H   fill:#E5E8D4,stroke:#6E7B3B,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 5</span>
+        <span class="text"><b>The convergence: harness components are being absorbed into the model.</b> In 2020–2022, every capability beyond raw text generation required external scaffolding — RAG, tool calls, chunking, memory, and routing were all harness responsibilities. By 2023, vision and structured function calling moved inside the model (GPT-4, LLaVA). By 2024–2025, search grounding (Gemini), code execution (GPT-4o), computer use (Claude 3.5), and 1M-token native context (Gemini 1.5) mean frontier models handle in one forward pass what previously required a full orchestration stack. What remains external — domain-specific RAG, enterprise memory, custom tool APIs — is the part the model cannot know at training time.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- References -->
+  <div class="section">
+    <p class="h3">References</p>
+    <div class="paper-list">
+      <div class="paper">
+        <span class="ref">Vaswani et al.<br/>NeurIPS 2017</span>
+        <span class="find"><b>Attention Is All You Need.</b> Introduced the Transformer — multi-head self-attention, no recurrence. Baseline for all subsequent LLMs.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Brown et al.<br/>NeurIPS 2020</span>
+        <span class="find"><b>Language Models are Few-Shot Learners.</b> GPT-3, 175B. Demonstrated emergent few-shot capabilities but exposed knowledge cutoff and hallucination problems at scale.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Lewis et al.<br/>NeurIPS 2020<br/>arXiv:2005.11401</span>
+        <span class="find"><b>Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.</b> First RAG paper — combines dense retriever with seq2seq generator to ground responses in source documents. Foundation of all modern RAG harnesses.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Wei et al.<br/>NeurIPS 2022<br/>arXiv:2201.11903</span>
+        <span class="find"><b>Chain-of-Thought Prompting Elicits Reasoning in Large Language Models.</b> Shows multi-step reasoning requires explicit CoT prompting — the bare LLM fails without it.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Alayrac et al.<br/>NeurIPS 2022<br/>arXiv:2204.14198</span>
+        <span class="find"><b>Flamingo: a Visual Language Model for Few-Shot Learning.</b> First major multimodal LLM bridging frozen language model + Perceiver vision encoder. Handles interleaved text/image sequences natively.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Yao et al.<br/>ICLR 2023<br/>arXiv:2210.03629</span>
+        <span class="find"><b>ReAct: Synergizing Reasoning and Acting in Language Models.</b> Demonstrates that tool use requires explicit reasoning-action scaffolding — the bare model cannot call APIs without structured prompting.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">OpenAI<br/>arXiv 2023<br/>arXiv:2303.08774</span>
+        <span class="find"><b>GPT-4 Technical Report.</b> Introduced native vision + function calling with structured JSON schemas. First frontier model to internalize tool use as a native output format.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Schick et al.<br/>NeurIPS 2023<br/>arXiv:2302.04761</span>
+        <span class="find"><b>Toolformer: Language Models Can Teach Themselves to Use Tools.</b> Self-supervised approach — model learns to insert API calls into its own outputs. 2× math performance gain; 98.1% tool invocation recall on LAMA.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Liu et al.<br/>NeurIPS 2023<br/>arXiv:2304.08485</span>
+        <span class="find"><b>Visual Instruction Tuning (LLaVA).</b> Open-source visual LLM connecting CLIP vision encoder + LLaMA. 85.1% of GPT-4V performance. Established open-source multimodal instruction tuning.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Packer et al.<br/>2023<br/>arXiv:2310.08560</span>
+        <span class="find"><b>MemGPT: Towards LLMs as Operating Systems.</b> Demonstrates LLMs are stateless by default — persistent memory across sessions requires an external OS-like memory management system.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Li et al.<br/>EMNLP 2023<br/>arXiv:2305.11747</span>
+        <span class="find"><b>HaluEval: A Large-Scale Hallucination Evaluation Benchmark.</b> Measures 35–60% factual error rate on QA, dialogue, and summarisation. Core empirical evidence that bare LLMs cannot be trusted without grounding.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Liu et al.<br/>TACL 2024<br/>arXiv:2307.03172</span>
+        <span class="find"><b>Lost in the Middle: How Language Models Use Long Contexts.</b> 20–30% accuracy drop when relevant evidence is in the middle of the context window. U-shaped performance curve across GPT-3.5, GPT-4, LLaMA, Claude.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Google<br/>arXiv 2024<br/>arXiv:2403.05530</span>
+        <span class="find"><b>Gemini 1.5 Technical Report.</b> 1M-token native context window. Processes 1hr video, 11hrs audio, 30K+ LOC in one forward pass — negating external chunking for many use cases.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Dated Data<br/>arXiv 2024<br/>arXiv:2403.12958</span>
+        <span class="find"><b>Dated Data: Tracing Knowledge Cutoffs in Large Language Models.</b> Effective cutoffs are earlier than reported due to recency bias in training data. Bare LLMs have unreliable time-awareness without retrieval.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">ACL 2025<br/>arXiv:2408.04667</span>
+        <span class="find"><b>Non-Determinism of "Deterministic" LLM Settings.</b> Accuracy varies up to ±15% at temperature=0 on identical inputs. Performance gap best-to-worst run up to 70%. Raw outputs are not reproducible without harness-level controls.</span>
+      </div>
+      <div class="paper">
+        <span class="ref">Anthropic<br/>Oct 2024</span>
+        <span class="find"><b>Computer Use (Claude 3.5 Sonnet).</b> 14.9% on OSWorld benchmark — previous SOTA was 7.8%. Native GUI interaction from screenshots (mouse, keyboard, browser) without external RPA.</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

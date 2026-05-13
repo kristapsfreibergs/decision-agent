@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LLM vs RLM — State of the Art 2025</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300..700;1,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="design/styles/tokens.css"/>
+<link rel="stylesheet" href="design/styles/base.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { padding: 32px 20px; }
+  .page { max-width: 1180px; padding: 40px 40px 60px; }
+  .mermaid svg { max-width: 100%; }
+
+  /* Reference list */
+  .refs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .refs li {
+    font-family: var(--font-sans);
+    font-size: var(--fs-11);
+    color: var(--ink-2);
+    padding: 10px 14px;
+    border-left: 2px solid var(--rule-4);
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 12px;
+  }
+  .refs li:hover { border-left-color: var(--c-blue); background: var(--paper-2); }
+  .refs .cite { font-family: var(--font-mono); font-size: var(--fs-10); color: var(--ink-3); }
+  .refs .title { color: var(--ink); font-weight: 500; }
+  .refs .venue { color: var(--ink-3); }
+
+  /* Comparison table */
+  .cmp-table { width: 100%; border-collapse: collapse; font-family: var(--font-sans); font-size: var(--fs-12); }
+  .cmp-table th {
+    text-align: left;
+    padding: 10px 16px;
+    background: var(--paper-2);
+    border: 1px solid var(--rule-4);
+    font-weight: 600;
+    font-size: var(--fs-10);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .cmp-table th.llm-h { background: var(--c-blue-t); border-top: 2px solid var(--c-blue); }
+  .cmp-table th.rlm-h { background: var(--c-teal-t); border-top: 2px solid var(--c-teal); }
+  .cmp-table td { padding: 9px 16px; border: 1px solid var(--rule-4); color: var(--ink-2); vertical-align: top; }
+  .cmp-table tr:nth-child(even) td { background: var(--paper-2); }
+  .cmp-table td.prop { font-weight: 600; color: var(--ink); background: var(--paper-2) !important; font-size: var(--fs-11); }
+  .good { color: var(--c-teal); font-weight: 600; }
+  .weak { color: var(--c-rose); font-weight: 600; }
+
+  @media print { body { padding: 0; } .page { max-width: 100%; } }
+</style>
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    background:            '#FBF9F4',
+    primaryColor:          '#E2EAF1',
+    primaryTextColor:      '#111111',
+    primaryBorderColor:    '#1F4E79',
+    lineColor:             '#4A4A48',
+    secondaryColor:        '#DCE9E6',
+    tertiaryColor:         '#F4F0E6',
+    fontFamily:            'Inter, Helvetica Neue, Arial, sans-serif',
+    fontSize:              '13px',
+    edgeLabelBackground:   '#FBF9F4',
+    clusterBkg:            '#F4F0E6',
+    clusterBorder:         '#8A8780',
+    titleColor:            '#111111',
+    actorBkg:              '#E2EAF1',
+    actorBorder:           '#1F4E79',
+    actorTextColor:        '#111111',
+    noteBkgColor:          '#F1E3D2',
+    noteBorderColor:       '#B5651D',
+    noteTextColor:         '#111111',
+    signalColor:           '#4A4A48',
+    signalTextColor:       '#111111',
+  }
+});
+</script>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Header ── -->
+  <div class="section" style="border-top:none;padding-top:0;margin-top:0;">
+    <p class="eyebrow">Survey · State of the Art · 2025</p>
+    <h1 class="h1">Large Language Models<br><em>versus</em> Recursive Language Models</h1>
+    <p class="lede">A comparative specification of how standard transformer-based LLMs and the emerging Recursive Language Model paradigm process language — covering architecture, inference mechanics, complexity, and research lineage.</p>
+  </div>
+
+  <!-- ── Fig 1: LLM Architecture ── -->
+  <div class="section">
+    <p class="h3">Fig 1 — LLM: Standard Transformer Pipeline</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 1</span>
+        <span>Autoregressive Transformer — Forward Pass</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#E2EAF1',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#1F4E79',
+  'lineColor': '#4A4A48', 'secondaryColor': '#DCE9E6',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '13px'
+}}}%%
+flowchart TB
+    subgraph IN["Input Processing"]
+        direction LR
+        TOK[Token Sequence<br/>t₁ … tₙ]
+        EMB[Token Embedding<br/>d_model dimensions]
+        PE[Positional Encoding<br/>RoPE · ALiBi · Sinusoidal]
+        TOK --> EMB --> PE
+    end
+
+    subgraph BLOCK["Transformer Block — × N layers  (Vaswani et al., 2017)"]
+        direction TB
+        MHA["Multi-Head Self-Attention<br/>softmax(Q·Kᵀ / √d_k) · V<br/>all tokens attend to all tokens — O(n²)"]
+        AN1[Add & LayerNorm]
+        FFN["Feed-Forward Network<br/>SwiGLU / GeLU activation<br/>d_ff = 4 × d_model"]
+        AN2[Add & LayerNorm]
+        MHA --> AN1 --> FFN --> AN2
+    end
+
+    subgraph EXT["SotA Extensions"]
+        direction LR
+        MOE["Sparse MoE<br/>(Fedus et al., 2022)"]
+        RLHF_["RLHF / DPO<br/>(Ouyang et al., 2022)"]
+        SSM_["State Space Models<br/>Mamba (Gu & Dao, 2023)"]
+    end
+
+    subgraph OUT["Output"]
+        direction LR
+        LMH["LM Head<br/>Linear + Softmax over vocab"]
+        TK[Next Token<br/>Autoregressive loop]
+        LMH --> TK
+    end
+
+    IN --> BLOCK
+    BLOCK -->|"repeat N times"| BLOCK
+    BLOCK --> OUT
+    EXT -. replaces / augments .-> BLOCK
+
+    style MOE  fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style RLHF_ fill:#F1E3D2,stroke:#B5651D,color:#111111
+    style SSM_  fill:#DCE9E6,stroke:#2F7F76,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 1</span>
+        <span class="text"><b>Autoregressive Transformer pipeline.</b> Input tokens are embedded and positionally encoded, then processed by N stacked transformer blocks. Each block applies multi-head self-attention — where every token attends to every other (O(n²) complexity) — followed by a feed-forward sublayer. Output is produced autoregressively, one token per forward pass. State-of-the-art extensions replace components: Sparse MoE scales capacity (Fedus et al., 2022), RLHF aligns outputs to human preference (Ouyang et al., 2022), and Mamba substitutes attention with linear-time SSM (Gu & Dao, 2023).</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fig 2: RLM Architecture ── -->
+  <div class="section">
+    <p class="h3">Fig 2 — RLM: Recursive Inference Loop</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 2</span>
+        <span>Recursive Language Model — REPL Paradigm (Zhang et al., 2025)</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#DCE9E6',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#2F7F76',
+  'lineColor': '#4A4A48', 'secondaryColor': '#E2EAF1',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '13px'
+}}}%%
+flowchart TB
+    subgraph CTX["External Context Store  (unbounded — 10M+ tokens)"]
+        direction LR
+        DOC[Raw Document / Long Context]
+        IDX[Index / Pointer Table]
+        DOC --- IDX
+    end
+
+    subgraph REPL["RLM REPL Loop  (Zhang et al., 2025  ·  arXiv 2512.24601)"]
+        direction TB
+        QRY[Query + Partial State]
+        PLAN["LLM: Decompose<br/>break task into sub-problems"]
+        CODE["LLM: Generate Code<br/>search · slice · filter · summarise · recurse"]
+        EXEC["Code Executor<br/>Python / Tool Calls"]
+        SUB["Sub-context Result<br/>fits within LLM context window"]
+        CHECK{"Sub-task<br/>resolved?"}
+
+        QRY --> PLAN --> CODE --> EXEC --> SUB --> CHECK
+        CHECK -->|"no — recurse deeper"| QRY
+    end
+
+    subgraph MERGE["Output Assembly"]
+        direction LR
+        COMB[Merge Sub-results<br/>hierarchical aggregation]
+        ANS[Final Answer]
+        COMB --> ANS
+    end
+
+    CTX -->|"retrieve slice via code"| EXEC
+    CHECK -->|yes| COMB
+
+    style QRY   fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style PLAN  fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style CODE  fill:#DCE9E6,stroke:#2F7F76,color:#111111
+    style EXEC  fill:#F1E3D2,stroke:#B5651D,color:#111111
+    style CHECK fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style ANS   fill:#DCE9E6,stroke:#2F7F76,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 2</span>
+        <span class="text"><b>RLM Recursive Inference Loop.</b> Rather than loading all context into a fixed attention window, the RLM treats the long document as an external variable in a REPL (Read-Eval-Print Loop). At each step the underlying LLM generates code — search, slice, filter, or recursive calls — to retrieve only the relevant sub-context. Execution results are fed back into the next iteration. This recursive decomposition continues until the sub-task is resolved, after which partial results are merged hierarchically. Zhang et al. (2025) demonstrate 100× context window expansion at a fraction of standard attention cost.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fig 3: Research Lineage ── -->
+  <div class="section">
+    <p class="h3">Fig 3 — Research Lineage</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 3</span>
+        <span>From Recursive Neural Networks to RLM</span>
+      </div>
+      <div class="figure-body">
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#FBF9F4', 'primaryColor': '#E2EAF1',
+  'primaryTextColor': '#111111', 'primaryBorderColor': '#1F4E79',
+  'lineColor': '#4A4A48', 'secondaryColor': '#DCE9E6',
+  'tertiaryColor': '#F4F0E6', 'clusterBkg': '#F4F0E6',
+  'clusterBorder': '#8A8780', 'edgeLabelBackground': '#FBF9F4',
+  'fontFamily': 'Inter, Arial, sans-serif', 'fontSize': '13px'
+}}}%%
+flowchart LR
+    A["<b>Recursive NNs</b><br/>Socher et al., 2013<br/>EMNLP<br/>—<br/>Tree-structured composition<br/>bottom-up phrase merging"]
+
+    B["<b>Transformers</b><br/>Vaswani et al., 2017<br/>NeurIPS<br/>—<br/>Flat self-attention<br/>parallel, fixed depth"]
+
+    C["<b>Universal Transformers</b><br/>Dehghani et al., 2019<br/>ICLR<br/>—<br/>Recurrent depth + ACT<br/>adaptive halting"]
+
+    D["<b>GPT-3 / LLMs</b><br/>Brown et al., 2020<br/>NeurIPS<br/>—<br/>Scale + few-shot<br/>175B parameters"]
+
+    E["<b>Looped Transformers</b><br/>Giannou et al., 2023<br/>ICML<br/>—<br/>Transformer as program<br/>Turing-complete loops"]
+
+    F["<b>Recursive LMs</b><br/>Zhang et al., 2025<br/>arXiv 2512.24601<br/>—<br/>REPL inference<br/>100× context expansion"]
+
+    A -->|inspires recursion| C
+    B -->|scales to| D
+    B -->|extends depth| C
+    C -->|loop semantics| E
+    D -->|adds recursion| F
+    E -->|programmable loops| F
+
+    style A fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style B fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style C fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style D fill:#E2EAF1,stroke:#1F4E79,color:#111111
+    style E fill:#E4DCEA,stroke:#6B4E7D,color:#111111
+    style F fill:#DCE9E6,stroke:#2F7F76,color:#111111
+        </div>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 3</span>
+        <span class="text"><b>Research lineage from recursive neural networks to RLM.</b> Two lines converge on Recursive Language Models: the <b>recursion line</b> (Socher 2013 → Universal Transformers 2019 → Looped Transformers 2023) and the <b>scale line</b> (Vaswani 2017 → GPT-3 2020). Zhang et al. (2025) synthesise both — using scaled LLMs as the base engine and applying recursive decomposition at inference time rather than at the architectural level.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fig 4: Comparison Table ── -->
+  <div class="section">
+    <p class="h3">Fig 4 — Property Comparison</p>
+    <div class="figure">
+      <div class="fig-header">
+        <span class="fid">Fig. 4</span>
+        <span>LLM vs RLM — Key Properties</span>
+      </div>
+      <div class="figure-body" style="padding: var(--figure-pad);">
+        <table class="cmp-table">
+          <thead>
+            <tr>
+              <th style="width:22%">Property</th>
+              <th class="llm-h" style="width:39%">LLM — Transformer</th>
+              <th class="rlm-h" style="width:39%">RLM — Recursive Inference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="prop">Context handling</td>
+              <td><span class="weak">Fixed window</span> — all tokens loaded into attention (4K–200K typical). Cost grows O(n²) with length.</td>
+              <td><span class="good">Unbounded</span> — document stored externally; code retrieves only relevant slices. 100× expansion demonstrated.</td>
+            </tr>
+            <tr>
+              <td class="prop">Processing depth</td>
+              <td><span class="weak">Fixed</span> — always N layers regardless of input complexity.</td>
+              <td><span class="good">Adaptive</span> — recursion depth scales with task complexity; simple queries terminate early.</td>
+            </tr>
+            <tr>
+              <td class="prop">Attention complexity</td>
+              <td><span class="weak">O(n²) per layer</span> — quadratic in sequence length. Mitigated by flash attention, sparse attention.</td>
+              <td><span class="good">Sub-linear overall</span> — each recursive call attends over a small slice; total cost ≪ full-context attention.</td>
+            </tr>
+            <tr>
+              <td class="prop">Compositionality</td>
+              <td>Emergent via scale — no explicit recursive structure.</td>
+              <td><span class="good">Explicit</span> — recursive decomposition mirrors hierarchical language structure (Chomsky, 1957).</td>
+            </tr>
+            <tr>
+              <td class="prop">Parallelism</td>
+              <td><span class="good">Fully parallel</span> — all tokens processed simultaneously during training and prefill.</td>
+              <td><span class="weak">Sequential by design</span> — each recursive call depends on the previous result.</td>
+            </tr>
+            <tr>
+              <td class="prop">Training requirement</td>
+              <td>Requires training / fine-tuning from scratch or SFT.</td>
+              <td><span class="good">Training-free</span> — inference-time strategy applied to any existing LLM.</td>
+            </tr>
+            <tr>
+              <td class="prop">Failure modes</td>
+              <td>Hallucination over long context; lost-in-the-middle; context drift.</td>
+              <td>Recursive loop divergence; code execution errors; sub-result aggregation errors.</td>
+            </tr>
+            <tr>
+              <td class="prop">Best suited for</td>
+              <td>Short-to-medium context tasks; generation; structured output; low-latency inference.</td>
+              <td>Very long documents; multi-hop retrieval; tasks requiring explicit hierarchical reasoning.</td>
+            </tr>
+            <tr>
+              <td class="prop">Key reference</td>
+              <td>Vaswani et al., <em>NeurIPS</em> 2017</td>
+              <td>Zhang, Kraska, Khattab — <em>arXiv</em> 2512.24601, 2025</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure-caption">
+        <span class="num">Fig. 4</span>
+        <span class="text"><b>LLM vs RLM property comparison.</b> The two paradigms are complementary rather than competing: RLM is an inference strategy that <em>wraps</em> a standard LLM, adding recursive decomposition on top of its existing capabilities. The primary trade-off is parallelism (LLM strength) versus unbounded context and adaptive depth (RLM strength).</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── References ── -->
+  <div class="section">
+    <p class="h3">References</p>
+    <ul class="refs">
+      <li>
+        <span class="cite">Vaswani et al.<br/>NeurIPS 2017</span>
+        <span><span class="title">Attention Is All You Need.</span> <span class="venue">Introduced the Transformer architecture — multi-head self-attention, positional encoding, encoder-decoder stack. Foundation of all modern LLMs.</span></span>
+      </li>
+      <li>
+        <span class="cite">Socher et al.<br/>EMNLP 2013</span>
+        <span><span class="title">Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank.</span> <span class="venue">Recursive Neural Tensor Networks exploiting parse-tree structure for compositional meaning — early foundation of recursive NLP.</span></span>
+      </li>
+      <li>
+        <span class="cite">Dehghani et al.<br/>ICLR 2019</span>
+        <span><span class="title">Universal Transformers.</span> <span class="venue">Transformer variant with recurrent depth and Adaptive Computation Time (ACT). Bridges fixed-depth transformers and recurrent networks; Turing-complete under certain assumptions.</span></span>
+      </li>
+      <li>
+        <span class="cite">Brown et al.<br/>NeurIPS 2020</span>
+        <span><span class="title">Language Models are Few-Shot Learners.</span> <span class="venue">GPT-3 — 175B parameter autoregressive LLM demonstrating emergent few-shot capabilities from scale alone.</span></span>
+      </li>
+      <li>
+        <span class="cite">Ouyang et al.<br/>NeurIPS 2022</span>
+        <span><span class="title">Training Language Models to Follow Instructions with Human Feedback.</span> <span class="venue">InstructGPT — RLHF alignment pipeline. Established the SFT → RM → PPO recipe adopted by GPT-4, Claude, Gemini.</span></span>
+      </li>
+      <li>
+        <span class="cite">Fedus et al.<br/>JMLR 2022</span>
+        <span><span class="title">Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity.</span> <span class="venue">Sparse Mixture-of-Experts replacing dense FFN layers. Routes each token to one expert, scaling capacity without proportional compute increase.</span></span>
+      </li>
+      <li>
+        <span class="cite">Giannou et al.<br/>ICML 2023</span>
+        <span><span class="title">Looped Transformers as Programmable Computers.</span> <span class="venue">Demonstrates that a looped transformer (same weights applied iteratively) can emulate arbitrary programs — linear algebra, in-context learning, calculator. Establishes theoretical basis for recursive transformer computation.</span></span>
+      </li>
+      <li>
+        <span class="cite">Gu & Dao<br/>arXiv 2023</span>
+        <span><span class="title">Mamba: Linear-Time Sequence Modeling with Selective State Spaces.</span> <span class="venue">State Space Model achieving O(n) inference complexity vs O(n²) attention. Selective state updates conditioned on input. 5× faster inference than transformers at equivalent perplexity.</span></span>
+      </li>
+      <li>
+        <span class="cite">Zhang, Kraska,<br/>Khattab · MIT<br/>arXiv 2025</span>
+        <span><span class="title">Recursive Language Models.</span> <span class="venue">arXiv:2512.24601. Introduces RLM — an inference paradigm treating long prompts as external variables in a REPL. The LLM recursively decomposes tasks and examines context via generated code (search, slice, filter, recurse), achieving 100×+ effective context expansion at a fraction of full-attention cost.</span></span>
+      </li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
