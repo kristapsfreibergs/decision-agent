@@ -17,7 +17,7 @@ EXPLORER_CATALOG: dict[str, dict[str, Any]] = {
             "and what existing patterns or conventions the implementers must follow. "
             "Write your findings to data/runs/{run_id}/workspace/codebase_context.md."
         ),
-        "read_paths": ["backend/src/**", "public/**", "docs/**", "README.md", "ARCHITECTURE.md"],
+        "read_paths": ["backend/src/**", "archive/public/**", "archive/docs/**", "archive/docs/README.md", "archive/docs/ARCHITECTURE.md"],
         "write_paths": ["data/runs/{run_id}/workspace/codebase_context.md"],
         "allowed_tools": ["read_file", "list_files", "write_file"],
         "output_fields": ["summary", "relevant_files", "patterns", "context_path"],
@@ -46,11 +46,11 @@ EXPLORER_CATALOG: dict[str, dict[str, Any]] = {
         "role": "document_reader",
         "goal_template": (
             "Read project documents and specifications relevant to: {task_context}. "
-            "Look in docs/** and literature/** for source material, requirements, and constraints. "
+            "Look in archive/docs/** and archive/literature/** for source material, requirements, and constraints. "
             "Summarise what downstream workers need to know and write it to "
             "data/runs/{run_id}/workspace/document_context.md."
         ),
-        "read_paths": ["docs/**", "literature/**"],
+        "read_paths": ["archive/docs/**", "archive/literature/**"],
         "write_paths": ["data/runs/{run_id}/workspace/document_context.md"],
         "allowed_tools": ["read_file", "list_files", "write_file"],
         "output_fields": ["summary", "relevant_documents", "key_requirements", "context_path"],
@@ -63,10 +63,10 @@ EXPLORER_CATALOG: dict[str, dict[str, Any]] = {
         "role": "knowledge_reader",
         "goal_template": (
             "Read the project knowledge store for context relevant to: {task_context}. "
-            "Look in knowledge/** for past decisions, preferences, and conventions. "
+            "Look in archive/knowledge/** for past decisions, preferences, and conventions. "
             "Summarise what is relevant and write to data/runs/{run_id}/workspace/knowledge_context.md."
         ),
-        "read_paths": ["knowledge/**"],
+        "read_paths": ["archive/knowledge/**"],
         "write_paths": ["data/runs/{run_id}/workspace/knowledge_context.md"],
         "allowed_tools": ["read_file", "list_files", "write_file"],
         "output_fields": ["summary", "relevant_entries", "context_path"],
