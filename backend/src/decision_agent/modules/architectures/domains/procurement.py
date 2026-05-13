@@ -328,7 +328,10 @@ def build_procurement_decomposition(task: dict[str, Any], run_id: str) -> dict[s
         # Procurement workers do multiple reads + structured analysis + final
         # JSON output. Complex evaluator/recommender workers need extra turns
         # for reads, optional artifact writes, and final JSON recovery nudges.
-        max_steps = 16 if worker["phase"] in {"evaluate", "recommend"} else 10
+        # 20 steps for evaluate/recommend: the model uses ~14-16 steps on reads
+        # and queries, then announces readiness. The nudge mechanism needs 2+
+        # remaining steps to fire and receive a JSON response. 16 was too tight.
+        max_steps = 20 if worker["phase"] in {"evaluate", "recommend"} else 10
         packages.append({
             "id": worker["id"],
             "worker_id": worker["id"],

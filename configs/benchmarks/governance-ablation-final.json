@@ -1,0 +1,8 @@
+{
+  "name": "governance_ablation_final",
+  "description": "Thesis empirical chapter: two-condition ablation (A0 vs F) across two procurement fixtures. procurement_laptops is the straightforward case — all compliant vendors fit the budget, so governance demonstrates scope enforcement and evidence traceability. procurement_impossible_constraint is the constrained case — no single vendor meets both the budget ceiling and ISO 27001 requirement simultaneously, so governance must produce an auditable ESCALATE with a traceable justification for why no vendor qualifies. Together these show: (1) governance eliminates scope violations, (2) governance creates an evidence trail that top-k retrieval cannot, (3) DAR gates consequential recommendations and escalates when constraints conflict.",
+  "conditions": ["A0", "F"],
+  "fixtures": ["procurement_laptops", "procurement_impossible_constraint"],
+  "reps": 5,
+  "timeout_seconds": 700
+}

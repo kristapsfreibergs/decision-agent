@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Governance Kernel — DSC · PAAP · DAR</title>
+    <link rel="stylesheet" href="assets/diagram.css" />
+    <style>
+      .section { margin-bottom: 36px; }
+
+      .section-title {
+        font-size: 20px;
+        font-weight: 800;
+        margin: 0 0 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .section-title .abbr { color: #20252b; }
+      .section-title .full { font-size: 14px; font-weight: 400; color: #6b7280; }
+
+      .section-title .pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(0,0,0,.12);
+      }
+
+      .pill-built   { background: #dff3e7; color: #123b22; }
+      .pill-planned { background: #fff0c2; color: #533000; }
+
+      .section-when {
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: #9ca3af;
+        margin-bottom: 14px;
+      }
+
+      .io-grid {
+        display: grid;
+        grid-template-columns: 1fr 24px 1fr 24px 1fr;
+        gap: 0;
+        align-items: stretch;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1.5px solid;
+      }
+
+      .io-grid.dsc  { border-color: #2b6fb3; }
+      .io-grid.paap { border-color: #16877a; }
+      .io-grid.dar  { border-color: #8157c2; }
+
+      .io-col { padding: 16px; background: #fff; }
+
+      .io-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #9ca3af;
+        background: #f7f6f2;
+      }
+
+      .io-label {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        margin-bottom: 10px;
+      }
+
+      .dsc  .io-label { color: #2b6fb3; }
+      .paap .io-label { color: #16877a; }
+      .dar  .io-label { color: #8157c2; }
+
+      .io-col p {
+        font-size: 13px;
+        color: #374151;
+        line-height: 1.6;
+        margin: 0 0 8px;
+      }
+
+      .io-col p:last-of-type { margin-bottom: 0; }
+
+      .io-col .cannot {
+        margin-top: 12px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        background: #faf9f5;
+        border: 1px solid #e8e4dc;
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.5;
+      }
+
+      .io-col .cannot strong { color: #374151; }
+
+      code, pre.inline-code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .code-block {
+        background: #1e2128;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11.5px;
+        line-height: 1.7;
+        margin: 8px 0;
+        white-space: pre;
+        overflow-x: auto;
+      }
+
+      .code-block .k { color: #7dd3fc; }
+      .code-block .v { color: #fde68a; }
+      .code-block .s { color: #86efac; }
+      .code-block .n { color: #f9a8d4; }
+      .code-block .c { color: #6b7280; }
+      .code-block .hi { color: #fbbf24; font-weight: 700; }
+
+      .artifact {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        padding: 6px 12px;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid rgba(0,0,0,.10);
+      }
+
+      .dsc  .artifact { background: #eef5ff; color: #1f5d9b; }
+      .paap .artifact { background: #eefaf8; color: #0f5952; }
+      .dar  .artifact { background: #f5efff; color: #3f2d78; }
+
+      /* chain summary */
+      .chain {
+        border: 1.5px solid #d9d4c8;
+        border-radius: 10px;
+        background: #1e2128;
+        padding: 18px 20px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        line-height: 2;
+        color: #e2e8f0;
+        white-space: pre;
+        overflow-x: auto;
+      }
+
+      .chain .step-label { color: #7dd3fc; }
+      .chain .arrow      { color: #6b7280; }
+      .chain .artifact   { color: #86efac; }
+      .chain .decision   { color: #fde68a; }
+      .chain .gate       { color: #f9a8d4; }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <div class="topbar">
+        <h1>Governance Kernel — DSC · PAAP · DAR</h1>
+        <a class="back" href="index.html">Back to index</a>
+      </div>
+
+      <!-- ── DOMAIN GENERALITY ── -->
+      <p style="color:#4b5563; font-size:13.5px; line-height:1.65; margin:0 0 14px;">
+        The governance kernel is <strong>domain-agnostic</strong>. When any decision type arrives, DSC loads the
+        matching scope contract — different required evidence, different authority weights, different
+        consequence rules. The chain that follows (PAAP → DAR → human gate) is identical for all of them.
+      </p>
+
+      <div style="overflow-x:auto; margin-bottom:32px;">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead>
+            <tr style="background:#20252b; color:#fff;">
+              <th style="padding:10px 14px; text-align:left; width:160px; font-size:11.5px; letter-spacing:.04em;">Decision type</th>
+              <th style="padding:10px 14px; text-align:left; font-size:11.5px; letter-spacing:.04em;">Required evidence classes</th>
+              <th style="padding:10px 14px; text-align:left; font-size:11.5px; letter-spacing:.04em;">Blocked</th>
+              <th style="padding:10px 14px; text-align:left; font-size:11.5px; letter-spacing:.04em;">Highest authority source</th>
+              <th style="padding:10px 14px; text-align:left; font-size:11.5px; letter-spacing:.04em;">DAR escalation trigger</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#eef5ff; border-bottom:1px solid #d9d4c8;">
+              <td style="padding:10px 14px; font-weight:700; color:#1f5d9b;">🛒 Procurement</td>
+              <td style="padding:10px 14px; color:#374151;"><code>compliance_rule</code>, <code>vendor_proposal</code></td>
+              <td style="padding:10px 14px; color:#7f1d1d;"><code>model_inference</code>, <code>personal_data</code></td>
+              <td style="padding:10px 14px; color:#374151;">Signed contract (1.00), ISO certificate (0.95)</td>
+              <td style="padding:10px 14px; color:#374151;"><code>publish_recommendation</code> → EXTERNAL_VISIBLE</td>
+            </tr>
+            <tr style="background:#fff; border-bottom:1px solid #d9d4c8;">
+              <td style="padding:10px 14px; font-weight:700; color:#374151;">📄 CV Evaluation</td>
+              <td style="padding:10px 14px; color:#374151;"><code>job_requirements</code>, <code>verified_qualification</code></td>
+              <td style="padding:10px 14px; color:#7f1d1d;"><code>personal_data</code> (name, age, gender, nationality — must never reach the scoring worker to prevent discrimination)</td>
+              <td style="padding:10px 14px; color:#374151;">Official qualification certificate (0.95), employer reference (0.80)</td>
+              <td style="padding:10px 14px; color:#374151;"><code>recommend_candidate</code> → EXTERNAL_VISIBLE</td>
+            </tr>
+            <tr style="background:#faf9f5; border-bottom:1px solid #d9d4c8;">
+              <td style="padding:10px 14px; font-weight:700; color:#374151;">💳 Purchase approval</td>
+              <td style="padding:10px 14px; color:#374151;"><code>price_quote</code>, <code>budget_approval</code></td>
+              <td style="padding:10px 14px; color:#7f1d1d;"><code>model_inference</code>, <code>marketing_material</code></td>
+              <td style="padding:10px 14px; color:#374151;">Approved budget record (0.90), official price quote (0.85)</td>
+              <td style="padding:10px 14px; color:#374151;"><code>place_order</code> → IRREVERSIBLE (above threshold)</td>
+            </tr>
+            <tr style="background:#fff; border-bottom:1px solid #d9d4c8;">
+              <td style="padding:10px 14px; font-weight:700; color:#374151;">🏗️ Land plot evaluation</td>
+              <td style="padding:10px 14px; color:#374151;"><code>cadastral_record</code>, <code>valuation_report</code>, <code>legal_title</code></td>
+              <td style="padding:10px 14px; color:#7f1d1d;"><code>model_inference</code>, <code>speculative_estimate</code></td>
+              <td style="padding:10px 14px; color:#374151;">Official cadastral record (1.00), independent valuation (0.90)</td>
+              <td style="padding:10px 14px; color:#374151;"><code>submit_offer</code> → IRREVERSIBLE</td>
+            </tr>
+            <tr style="background:#faf9f5;">
+              <td style="padding:10px 14px; font-weight:700; color:#374151;">🚗 Vehicle evaluation</td>
+              <td style="padding:10px 14px; color:#374151;"><code>technical_inspection</code>, <code>price_benchmark</code></td>
+              <td style="padding:10px 14px; color:#7f1d1d;"><code>dealer_self_report</code> (authority 0.30 — vendor's own claim), <code>model_inference</code></td>
+              <td style="padding:10px 14px; color:#374151;">Certified technical inspection (0.95), independent appraisal (0.85)</td>
+              <td style="padding:10px 14px; color:#374151;"><code>sign_contract</code> → IRREVERSIBLE</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="border:1.5px solid #d9d4c8; border-radius:10px; background:#faf9f5; padding:12px 16px; font-size:12.5px; color:#374151; line-height:1.65; margin-bottom:28px;">
+        <strong style="color:#20252b;">What changes per domain:</strong> the scope contract (required classes, authority weights, consequence table) — configured in <code>schema-map.json</code> and the domain module. &nbsp;
+        <strong style="color:#20252b;">What never changes:</strong> the governance kernel itself (DSC enforcement, PAAP formula, DAR policy engine, audit trail). Two weeks of configuration work per new domain. The kernel runs unchanged.
+      </div>
+
+      <!-- ── WHO ASSIGNS AUTHORITY WEIGHTS ── -->
+      <h2 style="font-size:18px; margin:0 0 8px;">Who assigns authority weights — and how</h2>
+      <p style="color:#4b5563; font-size:13px; line-height:1.65; margin:0 0 16px;">
+        In PageRank, scores emerge automatically from the link graph — no human assigns them.
+        In PAAP they do not. The <strong>base authority weight</strong> is a deliberate human decision,
+        assigned once per data source by a named organisational role. PAAP then applies automatic
+        adjustments on top of that base. The two responsibilities are separate and must stay that way.
+      </p>
+
+      <div style="display:grid; grid-template-columns:1fr 40px 1fr; gap:0; margin-bottom:16px; align-items:start;">
+
+        <!-- LEFT: manual assignment -->
+        <div style="border:2px solid #2b6fb3; border-radius:12px; overflow:hidden;">
+          <div style="background:#dfeaff; padding:10px 16px; font-weight:700; font-size:12px; color:#1f5d9b; letter-spacing:.04em; text-transform:uppercase;">
+            Manual — assigned once, by a named human role
+          </div>
+          <div style="padding:14px 16px; background:#fff;">
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+              <thead>
+                <tr style="border-bottom:1.5px solid #e8e4dc;">
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Source</th>
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Weight</th>
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Who decided</th>
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #f0ede8;">
+                  <td style="padding:6px 8px; font-family:monospace; font-size:11px; color:#374151;">signed_contract</td>
+                  <td style="padding:6px 8px; font-weight:800; color:#14532d;">1.00</td>
+                  <td style="padding:6px 8px; color:#374151;">Legal counsel</td>
+                  <td style="padding:6px 8px; color:#6b7280;">Legally binding — highest possible authority</td>
+                </tr>
+                <tr style="border-bottom:1px solid #f0ede8;">
+                  <td style="padding:6px 8px; font-family:monospace; font-size:11px; color:#374151;">compliance_rule</td>
+                  <td style="padding:6px 8px; font-weight:800; color:#14532d;">0.95</td>
+                  <td style="padding:6px 8px; color:#374151;">DPO / Compliance officer</td>
+                  <td style="padding:6px 8px; color:#6b7280;">Regulatory requirement — non-negotiable</td>
+                </tr>
+                <tr style="border-bottom:1px solid #f0ede8;">
+                  <td style="padding:6px 8px; font-family:monospace; font-size:11px; color:#374151;">budget_approval</td>
+                  <td style="padding:6px 8px; font-weight:800; color:#2d8a4e;">0.90</td>
+                  <td style="padding:6px 8px; color:#374151;">CFO / Finance controller</td>
+                  <td style="padding:6px 8px; color:#6b7280;">Approved by authorised financial officer</td>
+                </tr>
+                <tr style="border-bottom:1px solid #f0ede8;">
+                  <td style="padding:6px 8px; font-family:monospace; font-size:11px; color:#374151;">vendor_proposal</td>
+                  <td style="padding:6px 8px; font-weight:800; color:#c97a1f;">0.70</td>
+                  <td style="padding:6px 8px; color:#374151;">Procurement manager</td>
+                  <td style="padding:6px 8px; color:#6b7280;">Self-reported by vendor — must be independently verified</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 8px; font-family:monospace; font-size:11px; color:#374151;">model_inference</td>
+                  <td style="padding:6px 8px; font-weight:800; color:#c43a3a;">0.00</td>
+                  <td style="padding:6px 8px; color:#374151;">System architect</td>
+                  <td style="padding:6px 8px; color:#6b7280;">Model's own reasoning cannot be cited as evidence — blocks hallucination</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:11.5px; color:#6b7280; margin:10px 0 0; line-height:1.5;">
+              Stored in <code>schema-map.json</code>. Reviewed when data sources change or organisational policy is updated. One assignment per source type — not per run, not per document.
+            </p>
+          </div>
+        </div>
+
+        <!-- ARROW -->
+        <div style="display:flex; align-items:center; justify-content:center; font-size:24px; color:#9ca3af; padding:0 4px;">+</div>
+
+        <!-- RIGHT: automatic -->
+        <div style="border:2px solid #16877a; border-radius:12px; overflow:hidden;">
+          <div style="background:#d1faf5; padding:10px 16px; font-weight:700; font-size:12px; color:#0f5952; letter-spacing:.04em; text-transform:uppercase;">
+            Automatic — computed by PAAP per evidence item, per run
+          </div>
+          <div style="padding:14px 16px; background:#fff;">
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+              <thead>
+                <tr style="border-bottom:1.5px solid #e8e4dc;">
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Adjustment</th>
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">How computed</th>
+                  <th style="text-align:left; padding:5px 8px; color:#6b7280; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Effect</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #f0ede8;">
+                  <td style="padding:6px 8px; color:#374151; font-weight:600;">Temporal decay</td>
+                  <td style="padding:6px 8px; color:#374151; font-family:monospace; font-size:11px;">e^(−λ × age_days)</td>
+                  <td style="padding:6px 8px; color:#6b7280;">A cert expiring next month scores lower than one valid for two years. The older the source, the less it counts.</td>
+                </tr>
+                <tr style="border-bottom:1px solid #f0ede8;">
+                  <td style="padding:6px 8px; color:#374151; font-weight:600;">Corroboration boost</td>
+                  <td style="padding:6px 8px; color:#374151; font-family:monospace; font-size:11px;">1 + log(n_sources)</td>
+                  <td style="padding:6px 8px; color:#6b7280;">If three independent sources agree — proposal, certification, ranking all confirm ISO 27001 — the score rises. Like PageRank: agreement from multiple sources amplifies authority.</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 8px; color:#374151; font-weight:600;">Conflict penalty</td>
+                  <td style="padding:6px 8px; color:#374151; font-family:monospace; font-size:11px;">× (1 − conflict_fraction)</td>
+                  <td style="padding:6px 8px; color:#6b7280;">If the proposal claims ISO certified but the compliance database has no record, the score drops. Contradiction between sources reduces authority.</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size:11.5px; color:#6b7280; margin:10px 0 0; line-height:1.5;">
+              No human input for these — pure arithmetic. Same inputs always produce the same result. This is what makes PAAP deterministic and auditable.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="border:1.5px solid #d9d4c8; border-radius:10px; background:#faf9f5; padding:12px 16px; font-size:12.5px; color:#374151; line-height:1.65; margin-bottom:28px;">
+        <strong style="color:#20252b;">Final score = base weight (human, once) × temporal (automatic) × corroboration (automatic) × (1 − conflict) (automatic)</strong><br>
+        The human sets the organisational trust hierarchy. PAAP applies physics to it — freshness, agreement, contradiction. Neither can do the other's job.
+        When an auditor asks "why did this source score 1.03?": the answer has two parts — "because Legal assigned compliance_rule a weight of 0.95 in schema-map.json" and "because PAAP computed 0.99 temporal × 1.10 corroboration at runtime."
+        Both parts are inspectable. Both are recorded.
+      </div>
+
+      <!-- ── MAIN FLOW ── -->
+      <section class="diagram-card" style="margin-bottom:36px;">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant T  as Task
+    participant D  as DSC
+    participant W  as Workers
+    participant P  as PAAP
+    participant DA as DAR
+    participant H  as Human Gate
+
+    T  ->> D  : arrives (decision_type = any domain)
+    Note over D: DSC loads matching scope contract for this domain
+    D  -->> W : scope.json injected into all worker prompts
+    Note over D,W: query_sql enforces allowed_tables on every data access
+
+    Note over W: Parallel intake — requirement_analyst · market_scout · risk_assessor
+
+    W  ->> P  : evaluator submits output + evidence_sources declared
+    P  -->> P : scores each source (authority × temporal × corroboration)
+    Note right of P: evidence/worker_evaluator.json written
+    P  ->> DA : PASS — avg_score 0.85
+
+    DA -->> W : score_vendors → INTERNAL_REVERSIBLE → ALLOW
+    Note right of DA: authorization/worker_evaluator.json written
+
+    W  ->> P  : recommender submits output + evidence_sources declared
+    P  -->> P : scores each source
+    Note right of P: evidence/worker_recommender.json written
+    P  ->> DA : PASS
+
+    DA -->> H : publish_recommendation → EXTERNAL_VISIBLE → ESCALATE
+    Note right of DA: authorization/worker_recommender.json written
+
+    H  -->> H : reviews scope.json + evidence/*.json + authorization/*.json
+    H  ->> T  : approved → run_completed
+        </pre>
+      </section>
+
+      <!-- ══════════════════════════════════════════
+           DSC
+      ══════════════════════════════════════════ -->
+      <div class="section">
+        <div class="section-title">
+          <span class="abbr">DSC</span>
+          <span class="full">Decision Scope Contract</span>
+          <span class="pill pill-built">built</span>
+        </div>
+        <div class="section-when">① fires at architecture build &nbsp;·&nbsp; enforced at every query_sql call &nbsp;·&nbsp; checked at output validation</div>
+
+        <div class="io-grid dsc">
+          <div class="io-col">
+            <div class="io-label">Input</div>
+            <p><code>decision_type = "procurement"</code> and the domain evidence profile defined in <code>procurement.py</code>.</p>
+          </div>
+          <div class="io-arrow">→</div>
+          <div class="io-col">
+            <div class="io-label">What DSC produces → scope.json</div>
+            <div class="code-block"><span class="k">required_evidence_classes:</span>
+  [<span class="v">compliance_rule</span>, <span class="v">vendor_proposal</span>]
+
+<span class="k">allowed_evidence_classes:</span>
+  [<span class="v">signed_contract</span>,    <span class="c">1.00</span>
+   <span class="v">compliance_rule</span>,    <span class="c">0.95</span>
+   <span class="v">budget_approval</span>,    <span class="c">0.90</span>
+   <span class="v">vendor_proposal</span>,    <span class="c">0.70</span>
+   <span class="v">market_benchmark</span>]   <span class="c">0.65</span>
+
+<span class="k">blocked:</span>
+  [<span class="v">model_inference</span>]    <span class="c">0.00</span>
+
+<span class="k">phrase_blocklist:</span>
+  [<span class="v">"i think"</span>, <span class="v">"in my opinion"</span>,
+   <span class="v">"my gut says"</span>, ...]</div>
+          </div>
+          <div class="io-arrow">→</div>
+          <div class="io-col">
+            <div class="io-label">What happens next</div>
+            <p>The scope contract is injected into every worker's system prompt before it runs. The <code>query_sql</code> tool enforces <code>allowed_tables</code> — if the evaluator tries to query a table not in its contract, the tool returns an error and records a scope violation in <code>audit.jsonl</code>.</p>
+            <p>After the worker submits, the output validator checks the final JSON: if a worker cites <code>model_inference</code> as a source, it is rejected. If a <code>required_evidence_class</code> is absent from the citations, it is rejected.</p>
+            <span class="artifact">📄 scope.json</span>
+            <div class="cannot"><strong>What DSC cannot do:</strong> It cannot check whether the worker actually retrieved data from the required evidence classes — only whether it cited them in output. That is PAAP's job.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           PAAP
+      ══════════════════════════════════════════ -->
+      <div class="section">
+        <div class="section-title">
+          <span class="abbr">PAAP</span>
+          <span class="full">Provenance-Aware Authority Propagation</span>
+          <span class="pill pill-built">built</span>
+        </div>
+        <div class="section-when">② fires after every worker output passes DSC</div>
+
+        <div class="io-grid paap">
+          <div class="io-col">
+            <div class="io-label">Input — evidence_sources the evaluator declared</div>
+            <div class="code-block">[
+ {<span class="k">"id"</span>: <span class="v">"C001"</span>,
+  <span class="k">"type"</span>: <span class="v">"compliance_rule"</span>,
+  <span class="k">"excerpt"</span>: <span class="v">"Lenovo EMEA
+   ISO 27001:2022, BSI,
+   valid until 2026-09-14"</span>,
+  <span class="k">"created_at"</span>: <span class="v">"2026-09-14"</span>},
+
+ {<span class="k">"id"</span>: <span class="v">"P001"</span>,
+  <span class="k">"type"</span>: <span class="v">"vendor_proposal"</span>,
+  <span class="k">"excerpt"</span>: <span class="v">"Lenovo EMEA,
+   EUR 1799/unit, 6 weeks,
+   ISO certified"</span>,
+  <span class="k">"created_at"</span>: <span class="v">"2026-03-15"</span>},
+
+ {<span class="k">"id"</span>: <span class="v">"B001"</span>,
+  <span class="k">"type"</span>: <span class="v">"budget_approval"</span>,
+  <span class="k">"excerpt"</span>: <span class="v">"IT-Infrastructure
+   EUR 200,000 ceiling,
+   CFO Office, FY2026"</span>,
+  <span class="k">"created_at"</span>: <span class="v">"2026-02-01"</span>}
+]</div>
+          </div>
+          <div class="io-arrow">→</div>
+          <div class="io-col">
+            <div class="io-label">What PAAP computes for each source</div>
+            <div class="code-block"><span class="c">C001 — compliance_rule</span>
+  authority_weight  <span class="n">0.95</span>  <span class="c">(source tier)</span>
+  temporal_decay    <span class="n">0.99</span>  <span class="c">(cert still current)</span>
+  corroboration     <span class="n">1.10</span>  <span class="c">(proposal agrees)</span>
+  conflict_penalty  <span class="n">0.00</span>  <span class="c">(no contradiction)</span>
+  <span class="hi">score  0.95×0.99×1.10 = 1.03</span>
+
+<span class="c">P001 — vendor_proposal</span>
+  authority_weight  <span class="n">0.70</span>
+  temporal_decay    <span class="n">0.97</span>  <span class="c">(March 2026, recent)</span>
+  corroboration     <span class="n">1.00</span>
+  <span class="hi">score  0.70×0.97 = 0.68</span>
+
+<span class="c">B001 — budget_approval</span>
+  authority_weight  <span class="n">0.90</span>
+  temporal_decay    <span class="n">0.94</span>  <span class="c">(Feb 2026)</span>
+  corroboration     <span class="n">1.00</span>
+  <span class="hi">score  0.90×0.94 = 0.85</span>
+
+avg_score (1.03+0.68+0.85)/3 = <span class="s">0.85 → PASS</span>
+min check  all scores > 0.25  → <span class="s">PASS</span></div>
+          </div>
+          <div class="io-arrow">→</div>
+          <div class="io-col">
+            <div class="io-label">What happens next</div>
+            <p>Scored evidence records are written to <code>evidence/worker_evaluator.json</code> with authority weights, temporal scores, and the overall pass/fail verdict.</p>
+            <p>If PAAP passes, DAR evaluates the proposed action. If PAAP fails — evidence below threshold — the worker output is rejected and the worker retries from its last checkpoint. The worker never reaches DAR.</p>
+            <span class="artifact">📄 evidence/worker_evaluator.json</span>
+            <div class="cannot"><strong>What PAAP cannot do:</strong> It cannot decide whether the proposed action is permitted. That is DAR's job. PAAP only judges the quality of the evidence — not what should be done with it.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           DAR
+      ══════════════════════════════════════════ -->
+      <div class="section">
+        <div class="section-title">
+          <span class="abbr">DAR</span>
+          <span class="full">Decision Authorization Receipt</span>
+          <span class="pill pill-built">built</span>
+        </div>
+        <div class="section-when">③ fires after PAAP passes — before any action executes · fires twice in one procurement run</div>
+
+        <div class="io-grid dar">
+          <div class="io-col">
+            <div class="io-label">Input — twice per run</div>
+            <p><strong>Evaluator:</strong></p>
+            <div class="code-block">action_type:
+  <span class="v">score_vendors</span>
+consequence_class:
+  <span class="n">INTERNAL_REVERSIBLE</span>
+evidence_floor: <span class="s">met</span>
+human_gate:     <span class="s">enabled</span></div>
+            <p style="margin-top:12px;"><strong>Recommender:</strong></p>
+            <div class="code-block">action_type:
+  <span class="v">publish_recommendation</span>
+consequence_class:
+  <span class="n">EXTERNAL_VISIBLE</span>
+evidence_floor: <span class="s">met</span>
+human_gate:     <span class="s">enabled</span></div>
+          </div>
+          <div class="io-arrow">→</div>
+          <div class="io-col">
+            <div class="io-label">What DAR decides</div>
+            <p><strong>Evaluator — ALLOW</strong></p>
+            <p>Rule: <em>internal_reversible_allowed</em> — scoring vendors is a reversible internal action. Does not require human gate even with governance on. Run continues to next worker.</p>
+            <div class="code-block">{<span class="k">"decision"</span>: <span class="s">"ALLOW"</span>,
+ <span class="k">"rule_fired"</span>:
+   <span class="v">"internal_reversible_allowed"</span>,
+ <span class="k">"evidence_floor_met"</span>: <span class="s">true</span>,
+ <span class="k">"action_type"</span>: <span class="v">"score_vendors"</span>,
+ <span class="k">"timestamp"</span>: <span class="v">"2026-05-11T..."</span>}</div>
+            <p style="margin-top:12px;"><strong>Recommender — ESCALATE</strong></p>
+            <p>Rule: <em>external_visible_requires_human_gate</em> — publishing a recommendation outside the system affects the external world. Requires human approval before proceeding.</p>
+            <div class="code-block">{<span class="k">"decision"</span>: <span class="s">"ESCALATE"</span>,
+ <span class="k">"rule_fired"</span>:
+   <span class="v">"external_visible_requires_human_gate"</span>,
+ <span class="k">"evidence_floor_met"</span>: <span class="s">true</span>,
+ <span class="k">"action_type"</span>:
+   <span class="v">"publish_recommendation"</span>,
+ <span class="k">"timestamp"</span>: <span class="v">"2026-05-11T..."</span>}</div>
+          </div>
+          <div class="io-arrow">→</div>
+          <div class="io-col">
+            <div class="io-label">What happens next</div>
+            <p>The receipt is written before any action executes. After the evaluator gets ALLOW, the run continues to the recommender. After the recommender gets ESCALATE, the human gate opens and the run pauses.</p>
+            <p>The human reviews <code>scope.json</code>, <code>evidence/*.json</code>, <code>authorization/*.json</code>, and the recommendation brief — then approves or rejects. On approval: <code>run_completed</code>.</p>
+            <span class="artifact">📄 authorization/worker_evaluator.json</span>
+            <span class="artifact" style="margin-left:6px;">📄 authorization/worker_recommender.json</span>
+            <div class="cannot"><strong>What DAR cannot do:</strong> It cannot judge whether the recommendation is correct or whether the evidence is sufficient — that is DSC's and PAAP's job. DAR only decides whether the action type is permitted given the consequence class and evidence floor.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CHAIN SUMMARY ── -->
+      <h2 style="font-size:18px; margin:0 0 10px;">The chain — one line per step</h2>
+      <div class="chain"><span class="step-label">Task arrives</span>
+  <span class="arrow">→ DSC:</span> define scope <span class="arrow">→</span> <span class="artifact">scope.json</span> injected into all worker prompts
+  <span class="arrow">→</span> Workers run within DSC bounds (query_sql enforces allowed_tables)
+  <span class="arrow">→</span> Evaluator submits output with evidence_sources declared
+  <span class="arrow">→ PAAP:</span> score each source <span class="arrow">→</span> <span class="artifact">evidence/worker_evaluator.json</span> written
+  <span class="arrow">→</span> PAAP passes <span class="arrow">→ DAR</span> fires: score_vendors <span class="arrow">→</span> <span class="decision">ALLOW</span> <span class="arrow">→</span> run continues
+  <span class="arrow">→</span> Recommender submits output
+  <span class="arrow">→ PAAP:</span> score sources <span class="arrow">→</span> <span class="artifact">evidence/worker_recommender.json</span> written
+  <span class="arrow">→</span> PAAP passes <span class="arrow">→ DAR</span> fires: publish_recommendation <span class="arrow">→</span> <span class="gate">ESCALATE</span>
+  <span class="arrow">→</span> Human gate opens <span class="arrow">→</span> human reviews all artifacts <span class="arrow">→</span> approves
+  <span class="arrow">→</span> <span class="s">run_completed</span></div>
+
+    </main>
+    <script src="assets/diagram.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+  </body>
+</html>
