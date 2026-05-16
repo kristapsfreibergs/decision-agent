@@ -1,0 +1,1619 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiment Run Schemas</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f8;
+      --panel: #ffffff;
+      --ink: #1f2933;
+      --muted: #627184;
+      --line: #d9e0e8;
+      --accent: #176b87;
+      --code: #eef2f5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 30px clamp(18px, 4vw, 52px) 22px;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+      padding: 22px clamp(18px, 4vw, 52px) 48px;
+    }
+
+    section,
+    aside {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: clamp(16px, 2vw, 24px);
+      overflow: auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: clamp(20px, 2.4vw, 28px);
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+      max-width: 980px;
+      color: var(--muted);
+    }
+
+    code {
+      background: var(--code);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #253545;
+    }
+
+    pre {
+      margin: 0;
+      background: #f9fbfc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      overflow: auto;
+      color: #253545;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .summary div {
+      border-left: 4px solid var(--accent);
+      padding-left: 12px;
+    }
+
+    .summary strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .schema-table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .schema-table th,
+    .schema-table td {
+      padding: 9px 10px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .schema-table th {
+      background: var(--code);
+      color: var(--ink);
+    }
+
+    .schema-table td:first-child {
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--ink);
+    }
+
+    .mermaid {
+      min-width: 820px;
+      margin-top: 8px;
+    }
+
+    .contract-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .contract-block {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcfd;
+    }
+
+    .contract-block h3 {
+      margin-top: 0;
+    }
+
+    .contract-block pre {
+      font-size: 12px;
+      line-height: 1.35;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Experiment Run Schemas</h1>
+    <p>
+      Three experiment conditions for the procurement case: A is the informed single-prompt baseline, C is the
+      multi-agent run without governance, and F is the final fully governed stack.
+    </p>
+  </header>
+
+  <main>
+    <aside class="summary" aria-label="A summary">
+      <div>
+        <strong>What goes in</strong>
+        One prompt: role + task + synthetic context file.
+      </div>
+      <div>
+        <strong>How large</strong>
+        <code>12,497</code> input tokens, recorded by Anthropic usage logs.
+      </div>
+      <div>
+        <strong>Why evaluate it</strong>
+        Tests whether information alone helps, before adding enforceable graph/governance layers.
+      </div>
+    </aside>
+
+    <section>
+      <h2>Three-Run Experiment Design</h2>
+      <p>
+        The thesis comparison is intentionally simple: keep the procurement task fixed, then add structure in stages.
+        This makes it clear whether improvement comes from more information, from agent decomposition, or from
+        deterministic governance.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th>Execution form</th>
+            <th>Governance</th>
+            <th>Question answered</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A</td>
+            <td>Single informed LLM prompt, recorded earlier as <code>A0_inf</code>.</td>
+            <td>Off.</td>
+            <td>Can one model call choose correctly when all information is present?</td>
+          </tr>
+          <tr>
+            <td>C</td>
+            <td>Multiple agents over shared state.</td>
+            <td>DSC, PAAP, DAR, and human gate off; contract validators on.</td>
+            <td>Does decomposition alone fix the instability?</td>
+          </tr>
+          <tr>
+            <td>F</td>
+            <td>Multiple agents plus full deterministic governance.</td>
+            <td>DSC, PAAP, DAR, human gate, and contract validators on.</td>
+            <td>Does the governed stack convert extracted facts into an auditable decision?</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  A["A<br/>single prompt<br/>information only"]
+  C["C<br/>agent graph<br/>no governance"]
+  F["F<br/>agent graph<br/>full governance"]
+
+  A -->|"adds decomposition"| C
+  C -->|"adds enforcement"| F
+
+  LessonA["Observed A lesson<br/>unstable vendor choice"]
+  LessonC["Observed C lesson<br/>facts extracted, decision not completed"]
+  LessonF["Expected F test<br/>hard gates + audit + human review"]
+
+  A --> LessonA
+  C --> LessonC
+  F --> LessonF
+      </pre>
+    </section>
+
+    <section>
+      <h2>A Run Diagram</h2>
+      <p>
+        This is the first diagram for the experiment chapter: it shows the single informed prompt, recorded size,
+        generated output, and offline evaluation.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Case["Synthetic case<br/>procurement_laptops"]
+  System["System prompt<br/>procurement advisor<br/>JSON-only output"]
+  Context["Informed context file<br/>worker roles + evidence taxonomy<br/>scope rules + knowledge files"]
+  Prompt["A prompt / A0_inf<br/>one model input<br/>12,497 input tokens recorded"]
+  Model["LLM<br/>single completion call<br/>no tools"]
+  Output["Recommendation JSON<br/>3,809-9,898 output tokens observed<br/>vendor scores + shortlist + evidence"]
+  Metrics["Offline evaluation<br/>completion, traceability,<br/>evidence completeness,<br/>ground-truth accuracy"]
+  Compare["Purpose<br/>information-only baseline<br/>compare later with governed stack"]
+
+  System --> Prompt
+  Case --> Prompt
+  Context --> Prompt
+  Prompt --> Model --> Output --> Metrics --> Compare
+
+  Graph["Decision graph OFF"]
+  Agents["Agents OFF"]
+  Memory["Runtime memory OFF"]
+  Gov["DSC / PAAP / DAR enforcement OFF"]
+
+  Graph -. not used .-> Model
+  Agents -. not used .-> Model
+  Memory -. context only, no search/write .-> Context
+  Gov -. described, not enforced .-> Context
+      </pre>
+    </section>
+
+    <section>
+      <h2>What Goes Into The Prompt</h2>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Input block</th>
+            <th>Contents</th>
+            <th>Why included</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>System prompt</td>
+            <td>Expert procurement advisor role, required JSON fields, JSON-only instruction.</td>
+            <td>Defines task role and output contract, but does not enforce correctness.</td>
+          </tr>
+          <tr>
+            <td>Task</td>
+            <td>Procure 100 developer laptops for an EU office, budget, specs, warranty, ISO 27001, GDPR, delivery constraints.</td>
+            <td>The actual synthetic decision request.</td>
+          </tr>
+          <tr>
+            <td>Informed context</td>
+            <td>Worker roles/goals, output fields, PAAP evidence taxonomy, DSC scope rules, and procurement knowledge files.</td>
+            <td>Gives the model the same information later governed workers use, but without runtime enforcement.</td>
+          </tr>
+          <tr>
+            <td>Recorded total</td>
+            <td>Complete Anthropic request for this scenario.</td>
+            <td><code>12,497</code> input tokens in every recorded run.</td>
+          </tr>
+          <tr>
+            <td>Token source</td>
+            <td>Provider usage log, not local tokenizer estimate.</td>
+            <td><code>llm_call_usage.input_tokens</code> in <code>audit.jsonl</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Exact Run Configuration To Defend</h2>
+      <p>
+        These values are taken from the current code and local run audits.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+            <th>Source / note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Model</td>
+            <td><code>claude-haiku-4-5-20251001</code></td>
+            <td><code>.env</code>: <code>ANTHROPIC_MODEL</code></td>
+          </tr>
+          <tr>
+            <td>Temperature</td>
+            <td><code>1.0</code></td>
+            <td>Explicitly passed in <code>AnthropicProvider.complete_with_usage()</code>; this equals Anthropic's default and preserves natural variance.</td>
+          </tr>
+          <tr>
+            <td>Top-p</td>
+            <td><code>1.0</code></td>
+            <td>Explicitly passed; no nucleus truncation.</td>
+          </tr>
+          <tr>
+            <td>max_tokens</td>
+            <td><code>EXTENDED_MAX_TOKENS = 32000</code></td>
+            <td><code>backend/src/decision_agent/shared/providers/base.py</code></td>
+          </tr>
+          <tr>
+            <td>Call type</td>
+            <td>One <code>messages.create</code> call</td>
+            <td>No tools, no graph executor, no agent loop.</td>
+          </tr>
+          <tr>
+            <td>Recorded input tokens</td>
+            <td><code>12,497</code></td>
+            <td>Actual Anthropic usage recorded in <code>audit.jsonl</code>.</td>
+          </tr>
+          <tr>
+            <td>Recorded output tokens</td>
+            <td><code>3,809-9,898</code></td>
+            <td>Range across local informed single-prompt runs with the same input size.</td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>System prompt exact</h3>
+      <pre><code>You are an expert procurement advisor. You must evaluate ALL vendors listed in the knowledge files before making a recommendation. Be concise — one sentence per vendor in eliminated_vendors, one score per dimension in scored_vendors. Given a procurement task, produce a vendor recommendation as a JSON object with these fields: summary (string), eliminated_vendors (array of strings), scored_vendors (array of objects with vendor and score), shortlist (array of strings), evidence_sources (array of objects with id, type, excerpt, created_at). Output only the JSON object, nothing else.</code></pre>
+      <h3>User message structure</h3>
+      <pre><code>Task: Procure 100 developer laptops for new EU office
+
+[case.json description]
+
+[build_informed_context() output:
+  - worker roles and goals
+  - PAAP evidence taxonomy
+  - DSC scope rules
+  - knowledge files concatenated from:
+    - internal_laptop_policy.md
+    - eu_laptop_vendors_2026.md
+    - hardware_procurement_risks.md
+    - standard_scoring_rubric.md
+]</code></pre>
+    </section>
+
+    <section>
+      <h2>Thesis Table A.1</h2>
+      <p>
+        Experimental configuration for the A informed single-prompt baseline, recorded in the local artifacts as
+        <code>A0_inf</code>.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Model</td>
+            <td><code>claude-haiku-4-5-20251001</code></td>
+            <td>Anthropic, Oct 2025</td>
+          </tr>
+          <tr>
+            <td>Temperature</td>
+            <td><code>1.0</code></td>
+            <td>API default, explicitly set to default value</td>
+          </tr>
+          <tr>
+            <td><code>top_p</code></td>
+            <td><code>1.0</code></td>
+            <td>API default, full distribution</td>
+          </tr>
+          <tr>
+            <td><code>top_k</code></td>
+            <td>not set</td>
+            <td>API default, disabled</td>
+          </tr>
+          <tr>
+            <td><code>max_tokens</code></td>
+            <td><code>16,000</code></td>
+            <td>Extended for full 9-vendor evaluation</td>
+          </tr>
+          <tr>
+            <td>Context window</td>
+            <td><code>200,000</code></td>
+            <td>Model maximum</td>
+          </tr>
+          <tr>
+            <td>Input tokens</td>
+            <td><code>12,497</code></td>
+            <td>Fixed across all runs; recorded by Anthropic usage logs</td>
+          </tr>
+          <tr>
+            <td>Prompt caching</td>
+            <td>enabled</td>
+            <td><code>ANTHROPIC_PROMPT_CACHE=true</code>; Anthropic ephemeral cache on system prompt</td>
+          </tr>
+          <tr>
+            <td>Runs</td>
+            <td><code>11</code></td>
+            <td>1 warm-up + 10 parallel</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Recorded Output Tokens</h2>
+      <p>
+        The output is one JSON recommendation. The token values below are recorded Anthropic usage values from
+        <code>llm_call_usage.output_tokens</code> events in local <code>audit.jsonl</code> files.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Input tokens</th>
+            <th>Output tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>warm-up</code></td><td><code>12,497</code></td><td><code>8,627</code></td></tr>
+          <tr><td><code>parallel rep 1</code></td><td><code>12,497</code></td><td><code>8,040</code></td></tr>
+          <tr><td><code>parallel rep 2</code></td><td><code>12,497</code></td><td><code>6,165</code></td></tr>
+          <tr><td><code>parallel rep 3</code></td><td><code>12,497</code></td><td><code>6,059</code></td></tr>
+          <tr><td><code>parallel rep 4</code></td><td><code>12,497</code></td><td><code>4,670</code></td></tr>
+          <tr><td><code>parallel rep 5</code></td><td><code>12,497</code></td><td><code>9,898</code></td></tr>
+          <tr><td><code>parallel rep 6</code></td><td><code>12,497</code></td><td><code>7,262</code></td></tr>
+          <tr><td><code>parallel rep 7</code></td><td><code>12,497</code></td><td><code>6,669</code></td></tr>
+          <tr><td><code>parallel rep 8</code></td><td><code>12,497</code></td><td><code>3,809</code></td></tr>
+          <tr><td><code>parallel rep 9</code></td><td><code>12,497</code></td><td><code>6,957</code></td></tr>
+          <tr><td><code>parallel rep 10</code></td><td><code>12,497</code></td><td><code>7,251</code></td></tr>
+        </tbody>
+      </table>
+      <p>
+        Defensible range: <code>3,809-9,898</code> output tokens. Mean across the 11 thesis runs:
+        <code>6,855.18</code> output tokens. Median: <code>6,957</code>.
+      </p>
+    </section>
+
+    <section>
+      <h2>What Is Evaluated</h2>
+      <p>
+        Evaluation is offline. The model is not stopped while generating; instead, the resulting JSON is compared
+        against metrics and ground truth after the call finishes.
+      </p>
+      <pre class="mermaid">
+flowchart TB
+  JSON["Model JSON output"]
+
+  Completion["Completion<br/>did it return parseable output?"]
+  Traceability["Traceability<br/>are claims backed by evidence?"]
+  Evidence["Evidence completeness<br/>are required evidence types present?"]
+  Scope["Scope safety<br/>scope violations / unrecognized evidence"]
+  GT["Ground truth<br/>vendor, eliminations,<br/>constraints, outcome"]
+  Runtime["Runtime<br/>time to complete"]
+
+  JSON --> Completion
+  JSON --> Traceability
+  JSON --> Evidence
+  JSON --> Scope
+  JSON --> GT
+  JSON --> Runtime
+      </pre>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Question answered</th>
+            <th>Why it matters for A</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>run_completed</code></td><td>Did the model produce usable JSON?</td><td>Measures basic coverage of the information-only baseline.</td></tr>
+          <tr><td><code>recommendation_traceable</code></td><td>Can the recommendation be traced to evidence?</td><td>Tests whether context alone creates auditable reasoning.</td></tr>
+          <tr><td><code>evidence_completeness</code></td><td>Are required evidence classes present?</td><td>Tests whether the model follows evidence expectations without PAAP enforcement.</td></tr>
+          <tr><td><code>scope_violations</code></td><td>Did the output use out-of-scope evidence or claims?</td><td>Tests whether DSC rules work as text-only instructions.</td></tr>
+          <tr><td><code>gt_vendor_correct</code></td><td>Did it choose the ground-truth correct vendor?</td><td>Measures decision accuracy.</td></tr>
+          <tr><td><code>gt_eliminations_correct</code></td><td>Did it eliminate the correct invalid vendors?</td><td>Measures hard-constraint reasoning.</td></tr>
+          <tr><td><code>gt_constraints_detected</code></td><td>Did it notice budget, warranty, delivery, compliance constraints?</td><td>Measures extraction of decision-critical constraints.</td></tr>
+          <tr><td><code>gt_outcome_correct</code></td><td>Was the final outcome correct?</td><td>Measures end-to-end decision success.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Why This Scenario Exists</h2>
+      <p>
+        A, recorded here as <code>A0_inf</code>, is not the governed architecture. It is a stronger baseline than plain
+        A0 because the LLM
+        receives the same domain information in one prompt. The question is: does giving all information as text
+        approximate the benefits of the decision graph and governance layers?
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  A0inf["A / A0_inf<br/>all information in prompt"]
+  Question["Research question<br/>is information enough?"]
+  F["Later governed stack<br/>agents + state + memory + DSC/PAAP/DAR"]
+  Compare["Compare metrics<br/>traceability, evidence, accuracy, safety"]
+
+  A0inf --> Question
+  F --> Question
+  Question --> Compare
+      </pre>
+    </section>
+
+    <section>
+      <h2>How To Interpret The Synthetic Case</h2>
+      <p>
+        These files define the actual decision task, not just generic procurement scoring. The model receives a full
+        procurement dossier: the brief, internal laptop policy, hard constraints, scoring rubric, vendor facts, and risk
+        context. The experiment asks whether a single LLM prompt can consistently apply those files as a deterministic
+        procurement decision.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Input file</th>
+            <th>What a reader should notice</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>procurement_brief.md</code></td>
+            <td>Initial brief says EUR 200,000 total, about EUR 2,000 per unit.</td>
+          </tr>
+          <tr>
+            <td><code>internal_laptop_policy.md</code></td>
+            <td>Finance later tightens the real approved ceiling to EUR 180,000 total, EUR 1,800 per unit.</td>
+          </tr>
+          <tr>
+            <td><code>hard_constraints.json</code></td>
+            <td>Formal hard gates: price, total budget, ISO validity, GDPR DPA, EU warehouse, RAM, SSD, warranty, x86_64, physical performance cores, quote validity, and delivery deadline.</td>
+          </tr>
+          <tr>
+            <td><code>vendor_facts.json</code></td>
+            <td>Structured vendor facts with <code>primary_failure</code> markers. Atlas has <code>null</code>; Helio has <code>ubuntu_2404_verified</code>.</td>
+          </tr>
+          <tr>
+            <td><code>standard_scoring_rubric.md</code></td>
+            <td>Scoring weights are useful only after hard-gate filtering. The rubric's older EUR 2,000 figure is superseded by finance approval.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Deterministic Answer From The Files</h2>
+      <p>
+        Under the strict interpretation used for this thesis argument, <code>primary_failure</code> is treated as a hard-gate
+        elimination signal. That makes Vendor Atlas the clean deterministic winner.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Vendor</th>
+            <th>Hard-gate status</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Atlas</td><td>Pass</td><td>Meets price, delivery, ISO, GDPR, EU warehouse, RAM, SSD, x86_64, warranty, and Ubuntu verification.</td></tr>
+          <tr><td>Helio</td><td>Problematic</td><td><code>primary_failure = ubuntu_2404_verified</code>; attractive on price but not formally verified.</td></tr>
+          <tr><td>Ion</td><td>Eliminated</td><td>Quote expires before signature target.</td></tr>
+          <tr><td>Juniper</td><td>Eliminated</td><td>GDPR DPA blocker.</td></tr>
+          <tr><td>Fennel</td><td>Eliminated</td><td>Does not ship from EU warehouse.</td></tr>
+          <tr><td>Ember</td><td>Eliminated</td><td>ISO 27001 expired.</td></tr>
+          <tr><td>Granite</td><td>Eliminated</td><td>RAM/SSD below minimum.</td></tr>
+          <tr><td>Delta</td><td>Eliminated</td><td>Price, ARM64, ISO, and GDPR blocker.</td></tr>
+          <tr><td>Cinder</td><td>Eliminated</td><td>Exceeds EUR 1,800 unit ceiling and delivery risk after deadline.</td></tr>
+          <tr><td>Boreal</td><td>Possible but weaker</td><td>Lower quality and delivery confidence; legal review required; policy text raises performance concerns.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Deterministic recommendation: <strong>Vendor Atlas — AtlasBook T16 Gen 4</strong>. Reserve or fallback:
+        <strong>Boreal</strong>, unless legal/performance review rejects it. Helio should only be accepted if Ubuntu 24.04
+        verification is downgraded from hard gate to soft preference.
+      </p>
+    </section>
+
+    <section>
+      <h2>What The 50-Run Result Shows</h2>
+      <p>
+        The repeated LLM-only runs were executed under identical procurement conditions. The local result file contains
+        <code>51</code> runs. The model completed <code>47</code> and failed <code>4</code>. Among completed runs, it
+        alternated almost evenly between Atlas and Helio.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Outcome</th>
+            <th>Count</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Total runs in result file</td><td><code>51</code></td><td>One indexed batch containing reps 0-50.</td></tr>
+          <tr><td>Completed runs</td><td><code>47</code></td><td>Runs with parsed vendor recommendation.</td></tr>
+          <tr><td>Atlas selected</td><td><code>24 / 47 = 51.1%</code></td><td>Deterministic winner under strict hard-gate interpretation.</td></tr>
+          <tr><td>Helio selected</td><td><code>23 / 47 = 48.9%</code></td><td>Model treats a problematic vendor as nearly equivalent to Atlas.</td></tr>
+          <tr><td>Failed / no recommendation</td><td><code>4 / 51 = 7.8%</code></td><td>Failed reps: <code>23</code>, <code>29</code>, <code>33</code>, <code>46</code>.</td></tr>
+          <tr><td>Completion reliability</td><td><code>47 / 51 = 92.2%</code></td><td>The baseline also has runtime reliability failures.</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  Input["Same input files<br/>same prompt<br/>same model settings"]
+  Atlas["Atlas selected<br/>24 completed runs"]
+  Helio["Helio selected<br/>23 completed runs"]
+  None["No parsed winner<br/>4 runs"]
+  Claim["Interpretation<br/>LLM-only recommendation is unstable"]
+
+  Input --> Atlas
+  Input --> Helio
+  Input --> None
+  Atlas --> Claim
+  Helio --> Claim
+  None --> Claim
+      </pre>
+    </section>
+
+    <section>
+      <h2>A Data Analysis</h2>
+      <p>
+        The A run is useful because it shows several different failure modes at the same time. The model can often
+        produce a plausible vendor recommendation, but it cannot reliably produce the same recommendation, apply hard
+        eliminations, score vendors reproducibly, or create an auditable decision record.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Claim</th>
+            <th>Observed evidence</th>
+            <th>Why it supports the thesis</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>LLM-only procurement is unstable.</td>
+            <td>Atlas selected <code>24</code> times; Helio selected <code>23</code> times among <code>47</code> completed runs.</td>
+            <td>Identical inputs produce near-even disagreement in the final vendor recommendation.</td>
+          </tr>
+          <tr>
+            <td>Hard constraints are not reliably applied.</td>
+            <td>Helio is selected <code>23</code> times even though <code>vendor_facts.json</code> marks <code>primary_failure = ubuntu_2404_verified</code>.</td>
+            <td>A vendor with a structured primary failure remains competitive with the clean deterministic winner.</td>
+          </tr>
+          <tr>
+            <td>LLM scoring is inconsistent.</td>
+            <td>Atlas receives two different score patterns; Helio also receives two different score patterns.</td>
+            <td>Fixed facts and a fixed rubric still produce non-reproducible numerical scores.</td>
+          </tr>
+          <tr>
+            <td>Answer accuracy hides decision-quality failure.</td>
+            <td><code>gt_vendor_correct = true</code> in completed runs, but traceability, evidence completeness, authorization receipts, and output quality are all zero.</td>
+            <td>A plausible answer is not the same as a defensible decision process.</td>
+          </tr>
+          <tr>
+            <td>Elimination logic fails.</td>
+            <td><code>gt_eliminations_correct = false</code> in all <code>51</code> runs.</td>
+            <td>The model does not consistently separate hard disqualification rules from weighted preference criteria.</td>
+          </tr>
+          <tr>
+            <td>Runtime reliability matters.</td>
+            <td><code>4</code> runs fail with no recommendation, giving <code>92.2%</code> completion reliability.</td>
+            <td>A high-responsibility workflow needs runtime control and fallback behavior, not only better prompts.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>A Scoring Variance</h2>
+      <p>
+        The same vendor facts and scoring rubric produce different sub-scores across runs. This supports moving scoring
+        out of the LLM and into deterministic code.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Vendor</th>
+            <th>Score pattern</th>
+            <th>Count</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Atlas</td>
+            <td>Price <code>4</code>, Delivery <code>4</code>, Quality <code>4</code>, Compliance <code>4</code></td>
+            <td><code>20</code></td>
+            <td>Correct price score under the rubric for EUR 1,695.</td>
+          </tr>
+          <tr>
+            <td>Atlas</td>
+            <td>Price <code>3</code>, Delivery <code>4</code>, Quality <code>4</code>, Compliance <code>4</code></td>
+            <td><code>4</code></td>
+            <td>Price score changes even though the price is fixed.</td>
+          </tr>
+          <tr>
+            <td>Helio</td>
+            <td>Price <code>4</code>, Delivery <code>4</code>, Quality <code>3</code>, Compliance <code>4</code></td>
+            <td><code>22</code></td>
+            <td>Dominant Helio score pattern.</td>
+          </tr>
+          <tr>
+            <td>Helio</td>
+            <td>Price <code>4</code>, Delivery <code>3</code>, Quality <code>3</code>, Compliance <code>4</code></td>
+            <td><code>1</code></td>
+            <td>Delivery score also varies under unchanged facts.</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  Facts["Same vendor facts<br/>same rubric"]
+  LLMScore["LLM-generated scores"]
+  Var["Different sub-scores<br/>across repeated runs"]
+  Fix["Architecture implication<br/>LLM extracts facts<br/>deterministic code scores"]
+
+  Facts --> LLMScore --> Var --> Fix
+      </pre>
+    </section>
+
+    <section>
+      <h2>A Audit Metrics</h2>
+      <p>
+        The most important point is that vendor correctness alone is too weak. Even when the selected vendor is counted
+        as acceptable by the benchmark, the run lacks the evidence and authorization artifacts required for a
+        high-responsibility decision.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Observed result</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>recommendation_traceable</code></td><td><code>0 / 51</code></td><td>No run provides a traceable recommendation record.</td></tr>
+          <tr><td><code>evidence_completeness</code></td><td><code>0.0 in all 51 runs</code></td><td>The evidence record is incomplete across the entire baseline.</td></tr>
+          <tr><td><code>authorization_receipt_present</code></td><td><code>0 / 51</code></td><td>No run records an authorization receipt.</td></tr>
+          <tr><td><code>audit_completeness</code></td><td><code>0.2857 in all 51 runs</code></td><td>The audit trail is structurally incomplete.</td></tr>
+          <tr><td><code>output_quality</code></td><td><code>0.0 in all 51 runs</code></td><td>The output does not satisfy the quality checks used by the benchmark.</td></tr>
+          <tr><td><code>gt_eliminations_correct</code></td><td><code>0 / 51</code></td><td>Elimination logic fails in every run.</td></tr>
+          <tr><td><code>gt_accuracy</code></td><td><code>0.6667 in completed runs</code></td><td>Partial correctness can coexist with poor auditability.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Why Helio Selections Are A Failure</h2>
+      <p>
+        Atlas and Helio are not equivalent under the structured task facts. Atlas has no primary failure. Helio is
+        attractive on price and has strong scores, but <code>vendor_facts.json</code> marks the missing formal Ubuntu
+        24.04 verification as its primary failure.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Model likely over-weights</th>
+            <th>Model under-weights</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Lower price, strong delivery score, longer ISO validity, good battery/thermal specs.</td>
+            <td>Formal Ubuntu verification, hard-gate elimination logic, structured <code>primary_failure</code>, and cross-file authority ordering.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Thesis interpretation: LLM-only decision-making is unstable under a deterministic task specification. It can read
+        the same files and still alternate between two vendors because it does not reliably separate hard constraints from
+        soft preferences.
+      </p>
+    </section>
+
+    <section>
+      <h2>Architecture Lesson</h2>
+      <p>
+        This result supports changing the system role of the LLM. The LLM should extract and explain facts, while
+        deterministic components should enforce eligibility and ranking.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Docs["Documents"]
+  Extract["LLM fact extraction"]
+  Gates["Deterministic hard constraints"]
+  Score["Deterministic scoring/ranking"]
+  Explain["LLM explanation only"]
+  Decision["Stable recommendation"]
+
+  Docs --> Extract --> Gates --> Score --> Explain --> Decision
+
+  Bad["Avoid:<br/>documents -> LLM chooses vendor directly"]
+  Bad -. unstable .-> Decision
+      </pre>
+    </section>
+
+    <section>
+      <h2>A Thesis Paragraph</h2>
+      <p>
+        In the A LLM-only procurement condition, the same task was executed <code>51</code> times under identical input
+        conditions. The model completed <code>47</code> runs and failed <code>4</code> runs. Among completed runs, it
+        selected Vendor Atlas <code>24</code> times and Vendor Helio <code>23</code> times, demonstrating near-even
+        instability in the final recommendation. This instability is significant because the structured task data
+        identifies Atlas as having no primary failure, while Helio is marked with a primary failure related to Ubuntu
+        24.04 verification. Furthermore, all <code>51</code> runs lacked recommendation traceability, evidence
+        completeness, authorization receipts, and correct elimination handling. These results suggest that an LLM-only
+        decision process may produce plausible recommendations, but it does not provide the deterministic constraint
+        enforcement, reproducible scoring, or auditability required for high-responsibility procurement decisions.
+      </p>
+    </section>
+
+    <section>
+      <h2>Condition C: Multi-Agent, No Governance</h2>
+      <p>
+        Condition C keeps the procurement case and model family, but changes the execution form. Instead of one
+        monolithic prompt, the system runs a sequence of specialized agents over shared state. The deterministic
+        governance layers are disabled, so the run tests whether agent decomposition alone is enough to produce a
+        stable procurement decision.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Inputs["Same synthetic task files<br/>brief + requirements + vendors + risks + rubric"]
+  Req["RequirementAgent<br/>extract constraints"]
+  Evidence["EvidenceAgent<br/>market facts + risk context"]
+  Norm["NormalizationAgent<br/>merge into shared state"]
+  Elig["EligibilityAgent<br/>filter candidates"]
+  Eval["EvaluationAgent<br/>score and rank"]
+  Stop["Observed outcome<br/>run stops before recommendation"]
+
+  Inputs --> Req --> Evidence --> Norm --> Elig --> Eval --> Stop
+
+  DSC["DSC OFF"]
+  PAAP["PAAP OFF"]
+  DAR["DAR OFF"]
+  Human["Human gate OFF"]
+  Contracts["Contract validators ON<br/>limited schema checks"]
+
+  DSC -. no governance enforcement .-> Elig
+  PAAP -. no evidence-policy enforcement .-> Evidence
+  DAR -. no decision audit review .-> Eval
+  Human -. no approval gate .-> Stop
+  Contracts -. still enabled .-> Eval
+      </pre>
+    </section>
+
+    <section>
+      <h2>C Run Configuration</h2>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Value in C</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Decision graph</td>
+            <td>Enabled</td>
+            <td>The task is decomposed into agent steps instead of one LLM call.</td>
+          </tr>
+          <tr>
+            <td>Agents</td>
+            <td>Requirement, Evidence, Normalization, Eligibility, Evaluation</td>
+            <td>The current observed run reaches evaluation but stops before final recommendation.</td>
+          </tr>
+          <tr>
+            <td>DSC</td>
+            <td><code>false</code></td>
+            <td>Decision scope control is not enforcing boundaries.</td>
+          </tr>
+          <tr>
+            <td>PAAP</td>
+            <td><code>false</code></td>
+            <td>Evidence-policy validation is not enforcing evidence sufficiency.</td>
+          </tr>
+          <tr>
+            <td>DAR</td>
+            <td><code>false</code></td>
+            <td>Decision audit review is not validating the final decision path.</td>
+          </tr>
+          <tr>
+            <td>Human gate</td>
+            <td><code>false</code></td>
+            <td>No human approval checkpoint is applied.</td>
+          </tr>
+          <tr>
+            <td>Contract validators</td>
+            <td><code>true</code></td>
+            <td>Basic state/output contracts remain enabled, but they do not replace governance.</td>
+          </tr>
+          <tr>
+            <td>Observed completion</td>
+            <td><code>run_completed = false</code></td>
+            <td>The local C run did not produce a final recommendation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>What Goes Into Each Agent</h2>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Input files / state</th>
+            <th>Expected role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RequirementAgent</td>
+            <td><code>procurement_brief.md</code>, <code>internal_laptop_policy.md</code>, <code>hard_constraints.json</code></td>
+            <td>Extract the hard requirements: budget ceiling, delivery deadline, warranty, ISO, GDPR, EU warehouse, x86_64, RAM, SSD, and Linux constraints.</td>
+          </tr>
+          <tr>
+            <td>EvidenceAgent</td>
+            <td><code>eu_laptop_vendors_2026.md</code>, <code>vendor_facts.json</code>, <code>hardware_procurement_risks.md</code></td>
+            <td>Collect vendor evidence, identify risks, and distinguish Atlas from Helio.</td>
+          </tr>
+          <tr>
+            <td>NormalizationAgent</td>
+            <td>Generated requirements and evidence state.</td>
+            <td>Merge extracted facts into a consistent shared state.</td>
+          </tr>
+          <tr>
+            <td>EligibilityAgent</td>
+            <td>Normalized state and vendor candidates.</td>
+            <td>Apply hard constraints and produce eligible/eliminated vendor lists.</td>
+          </tr>
+          <tr>
+            <td>EvaluationAgent</td>
+            <td><code>standard_scoring_rubric.md</code>, <code>hard_constraints.json</code>, <code>vendor_facts.json</code>, and generated workspace files.</td>
+            <td>Score eligible vendors and prepare ranking for recommendation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Agent Input / Output Contracts</h2>
+      <p>
+        This is the simple way to explain the agent graph to readers: each agent receives a structured input, performs
+        a bounded task, and passes a structured output to the next agent. Governance checks validate these handoffs in
+        condition F.
+      </p>
+      <div class="contract-grid">
+        <div class="contract-block">
+          <h3>1. RequirementAgent</h3>
+          <p>Turns the procurement request into explicit constraints.</p>
+          <pre>{
+  "task": "Procure 100 developer laptops",
+  "files": [
+    "procurement_brief.md",
+    "internal_laptop_policy.md",
+    "hard_constraints.json"
+  ]
+}</pre>
+          <pre>{
+  "procurement_subject": "developer laptops",
+  "quantity": 100,
+  "hard_constraints": {
+    "unit_price_eur_max": 1800,
+    "total_price_eur_max": 180000,
+    "ram_gb_min": 32,
+    "ssd_tb_min": 1,
+    "architecture": "x86_64",
+    "ubuntu_2404_verified": true,
+    "gdpr_dpa_required": true,
+    "iso_27001_current": true
+  }
+}</pre>
+          <p>Offers the rest of the graph a clean definition of what must be true before any vendor can win.</p>
+        </div>
+
+        <div class="contract-block">
+          <h3>2. EvidenceAgent</h3>
+          <p>Collects vendor facts and risk evidence.</p>
+          <pre>{
+  "requirements": "RequirementAgent output",
+  "files": [
+    "eu_laptop_vendors_2026.md",
+    "vendor_facts.json",
+    "hardware_procurement_risks.md"
+  ],
+  "memory_search": true
+}</pre>
+          <pre>{
+  "vendors": [
+    {
+      "vendor": "Atlas",
+      "model": "AtlasBook T16 Gen 4",
+      "unit_price_eur": 1695,
+      "primary_failure": null,
+      "evidence_sources": ["vendor_facts.json"]
+    },
+    {
+      "vendor": "Helio",
+      "model": "HelioForge 16X",
+      "unit_price_eur": 1665,
+      "primary_failure": "ubuntu_2404_verified"
+    }
+  ],
+  "risk_notes": [...]
+}</pre>
+          <p>Offers sourced evidence, not a final decision.</p>
+        </div>
+
+        <div class="contract-block">
+          <h3>3. NormalizationAgent</h3>
+          <p>Standardizes fields so later agents do not compare inconsistent formats.</p>
+          <pre>{
+  "requirements": "RequirementAgent output",
+  "evidence": "EvidenceAgent output"
+}</pre>
+          <pre>{
+  "normalized_state": {
+    "currency": "EUR",
+    "deadline": "2026-07-25",
+    "vendors": [
+      {
+        "vendor": "Atlas",
+        "unit_price_eur": 1695,
+        "total_price_eur": 169500,
+        "delivery_date": "2026-07-20"
+      }
+    ]
+  }
+}</pre>
+          <p>Offers one shared decision state with comparable units, dates, names, and constraint fields.</p>
+        </div>
+
+        <div class="contract-block">
+          <h3>4. EligibilityAgent</h3>
+          <p>Applies hard gates before scoring.</p>
+          <pre>{
+  "normalized_state": "NormalizationAgent output",
+  "hard_constraints": "RequirementAgent output"
+}</pre>
+          <pre>{
+  "eligible_vendors": ["Atlas", "Boreal"],
+  "eliminated_vendors": [
+    {
+      "vendor": "Helio",
+      "reason": "ubuntu_2404_verified failed"
+    },
+    {
+      "vendor": "Delta",
+      "reason": "unit_price_finance_ceiling failed"
+    }
+  ]
+}</pre>
+          <p>Offers a deterministic boundary: failed vendors do not move into scoring.</p>
+        </div>
+
+        <div class="contract-block">
+          <h3>5. EvaluationAgent</h3>
+          <p>Scores only vendors that survived eligibility.</p>
+          <pre>{
+  "eligible_vendors": "EligibilityAgent output",
+  "rubric": "standard_scoring_rubric.md",
+  "evidence": "normalized evidence"
+}</pre>
+          <pre>{
+  "scored_vendors": [
+    {
+      "vendor": "Atlas",
+      "scores": {
+        "price": 4,
+        "delivery": 4,
+        "quality": 4,
+        "compliance": 4
+      },
+      "evidence_sources": [...]
+    }
+  ],
+  "ranking": ["Atlas", "Boreal"]
+}</pre>
+          <p>Offers a reproducible ranking and score explanation, not authority to award.</p>
+        </div>
+
+        <div class="contract-block">
+          <h3>6. RecommendationAgent</h3>
+          <p>Writes the decision brief from the ranked vendors.</p>
+          <pre>{
+  "ranking": "EvaluationAgent output",
+  "risks": "EvidenceAgent risk notes",
+  "audit_status": "governance receipts"
+}</pre>
+          <pre>{
+  "recommended_vendor": "Atlas",
+  "summary": "Recommend AtlasBook T16 Gen 4.",
+  "fallback": "Boreal if legal/performance review passes",
+  "decision_required": "approve award or request revision"
+}</pre>
+          <p>Offers a human-readable recommendation package for approval or, in future autonomous mode, for DAR authorization.</p>
+        </div>
+
+        <div class="contract-block">
+          <h3>7. StateValidationAgent</h3>
+          <p>Checks that the final state is internally consistent before the run is accepted.</p>
+          <pre>{
+  "final_state": "all previous outputs",
+  "governance_receipts": ["DSC", "PAAP", "DAR"],
+  "audit_log": "run audit events"
+}</pre>
+          <pre>{
+  "validated": true,
+  "invariants": {
+    "winner_is_eligible": true,
+    "evidence_floor_met": true,
+    "authorization_recorded": true,
+    "no_unresolved_hard_failures": true
+  }
+}</pre>
+          <p>Offers the final pass/fail signal: the run is accepted, blocked, or escalated.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Agent Output Routing</h2>
+      <p>
+        This diagram shows the same agents as data producers and consumers. Numbered outputs are written to shared
+        decision state, then reused by later agents. This is why the graph is more than a simple prompt chain: one
+        agent's output can feed several later agents.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  InputFiles["Input files<br/>brief, policy, constraints,<br/>vendors, risks, rubric"]
+  State["Shared decision state<br/>immutable patches / audit log"]
+
+  A1["Agent 1<br/>RequirementAgent"]
+  O1["Output 1<br/>requirements.json<br/>hard constraints"]
+
+  A2["Agent 2<br/>EvidenceAgent"]
+  O2["Output 2<br/>evidence.json<br/>vendor facts + risks"]
+
+  A3["Agent 3<br/>NormalizationAgent"]
+  O3["Output 3<br/>normalized_state.json<br/>standard units + dates"]
+
+  A4["Agent 4<br/>EligibilityAgent"]
+  O4["Output 4<br/>eligibility.json<br/>eligible + eliminated"]
+
+  A5["Agent 5<br/>EvaluationAgent"]
+  O5["Output 5<br/>evaluation.json<br/>scores + ranking"]
+
+  A6["Agent 6<br/>RecommendationAgent"]
+  O6["Output 6<br/>recommendation.json<br/>decision brief"]
+
+  A7["Agent 7<br/>StateValidationAgent"]
+  O7["Output 7<br/>validation.json<br/>accepted / blocked / escalated"]
+
+  InputFiles --> A1 --> O1 --> State
+  InputFiles --> A2 --> O2 --> State
+  O1 --> A3
+  O2 --> A3
+  A3 --> O3 --> State
+
+  O1 --> A4
+  O2 --> A4
+  O3 --> A4
+  A4 --> O4 --> State
+
+  O1 --> A5
+  O2 --> A5
+  O3 --> A5
+  O4 --> A5
+  InputFiles --> A5
+  A5 --> O5 --> State
+
+  O2 --> A6
+  O4 --> A6
+  O5 --> A6
+  A6 --> O6 --> State
+
+  O1 --> A7
+  O2 --> A7
+  O4 --> A7
+  O5 --> A7
+  O6 --> A7
+  State --> A7
+  A7 --> O7
+      </pre>
+    </section>
+
+    <section>
+      <h2>Routing Table</h2>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Output</th>
+            <th>Produced by</th>
+            <th>Consumed by</th>
+            <th>Why it is reused</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>O1 requirements.json</code></td>
+            <td>RequirementAgent</td>
+            <td>NormalizationAgent, EligibilityAgent, EvaluationAgent, StateValidationAgent</td>
+            <td>Every later decision must know the hard constraints and procurement target.</td>
+          </tr>
+          <tr>
+            <td><code>O2 evidence.json</code></td>
+            <td>EvidenceAgent</td>
+            <td>NormalizationAgent, EligibilityAgent, EvaluationAgent, RecommendationAgent, StateValidationAgent</td>
+            <td>Vendor facts and risks are needed for filtering, scoring, explanation, and audit.</td>
+          </tr>
+          <tr>
+            <td><code>O3 normalized_state.json</code></td>
+            <td>NormalizationAgent</td>
+            <td>EligibilityAgent, EvaluationAgent</td>
+            <td>Later agents should compare normalized prices, dates, names, and units.</td>
+          </tr>
+          <tr>
+            <td><code>O4 eligibility.json</code></td>
+            <td>EligibilityAgent</td>
+            <td>EvaluationAgent, RecommendationAgent, StateValidationAgent</td>
+            <td>Only eligible vendors should be scored or recommended.</td>
+          </tr>
+          <tr>
+            <td><code>O5 evaluation.json</code></td>
+            <td>EvaluationAgent</td>
+            <td>RecommendationAgent, StateValidationAgent</td>
+            <td>The recommendation brief needs ranked vendors and score justification.</td>
+          </tr>
+          <tr>
+            <td><code>O6 recommendation.json</code></td>
+            <td>RecommendationAgent</td>
+            <td>StateValidationAgent, human gate, future autonomous award gate</td>
+            <td>The final proposed action must be validated before acceptance or award.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Observed C Output</h2>
+      <p>
+        The important result is not that C makes a wrong final vendor choice. The current local C run does not reach a
+        final choice. It shows a different failure mode: agents can extract useful intermediate facts, but without
+        deterministic governance and reliable state handoff, the pipeline does not convert those facts into an auditable
+        decision.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Observed behavior</th>
+            <th>What one can see</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RequirementAgent</td>
+            <td>Succeeds.</td>
+            <td>It extracts the stricter finance ceiling: <code>EUR 180,000</code> total and <code>EUR 1,800</code> per unit.</td>
+          </tr>
+          <tr>
+            <td>EvidenceAgent</td>
+            <td>Succeeds.</td>
+            <td>It identifies Atlas as the primary candidate and records Helio's Ubuntu certification gap.</td>
+          </tr>
+          <tr>
+            <td>NormalizationAgent</td>
+            <td>Succeeds.</td>
+            <td>Requirements and evidence are merged into shared state.</td>
+          </tr>
+          <tr>
+            <td>EligibilityAgent</td>
+            <td>Returns empty lists.</td>
+            <td><code>eligible = []</code> and <code>eliminated = []</code>, even though vendor evidence exists.</td>
+          </tr>
+          <tr>
+            <td>EvaluationAgent</td>
+            <td>Starts, writes evaluation output, then the run fails.</td>
+            <td>Observed error: <code>'str' object has no attribute 'get'</code>.</td>
+          </tr>
+          <tr>
+            <td>Final recommendation</td>
+            <td>Not produced.</td>
+            <td><code>recommended_vendor = none</code>, <code>run_completed = false</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Why C Matters</h2>
+      <p>
+        Condition C improves over A in one way: the system no longer asks one model call to do every task at once.
+        Requirement extraction and evidence collection become clearer. However, C also shows that multiple agents are
+        not automatically safer than a single prompt. If state contracts and governance are weak, correct facts can be
+        discovered and still fail to produce a valid decision.
+      </p>
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> RequirementsExtracted: RequirementAgent succeeds
+  RequirementsExtracted --> EvidenceCollected: EvidenceAgent succeeds
+  EvidenceCollected --> StateNormalized: NormalizationAgent succeeds
+  StateNormalized --> EligibilityEmpty: EligibilityAgent returns empty lists
+  EligibilityEmpty --> EvaluationStarted: EvaluationAgent starts
+  EvaluationStarted --> FailedRun: schema/type failure
+  FailedRun --> [*]
+
+  note right of EligibilityEmpty
+    Facts exist, but candidate eligibility
+    is not carried forward reliably.
+  end note
+      </pre>
+      <p>
+        Thesis interpretation: C demonstrates that agent decomposition alone is insufficient. It helps expose the right
+        facts, but the final decision still needs deterministic hard gates, stable state contracts, and governance checks
+        before downstream agents are allowed to continue.
+      </p>
+    </section>
+
+    <section>
+      <h2>Condition F: Full Governed Stack</h2>
+      <p>
+        Condition F is the final experiment condition. It uses the same procurement task and the same multi-agent
+        decomposition as C, but turns on the full governance layer. This means the system should not rely on the LLM to
+        remember which constraints are hard. Hard gates, evidence policy, action review, contract validators, and human
+        approval become part of the execution path.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Control["LayerConfig / governance control plane<br/>DSC=true, PAAP=true, DAR=true,<br/>human_gate=true, validators=true"]
+  Inputs["Same synthetic task files<br/>brief + constraints + policy + vendors + risks + rubric"]
+
+  Req["RequirementAgent<br/>DSC scope check<br/>extract requirements"]
+  Evidence["EvidenceAgent<br/>DSC scope check<br/>PAAP evidence check"]
+  Norm["NormalizationAgent<br/>normalize state<br/>validate state shape"]
+  Gate["Deterministic hard gates<br/>eligibility before scoring"]
+  Eval["EvaluationAgent<br/>PAAP evidence check<br/>DAR action check"]
+  Rec["RecommendationAgent<br/>DAR action check<br/>decision brief only"]
+  Human["Human gate<br/>approve / reject / request changes"]
+  Audit["Audit record<br/>scope + evidence + action receipts"]
+
+  Control --> Req
+  Control --> Evidence
+  Control --> Norm
+  Control --> Gate
+  Control --> Eval
+  Control --> Rec
+  Control --> Human
+
+  Inputs --> Req --> Evidence --> Norm --> Gate --> Eval --> Rec --> Human --> Audit
+
+  DSC["DSC ON<br/>scope and allowed evidence"]
+  PAAP["PAAP ON<br/>evidence authority and sufficiency"]
+  DAR["DAR ON<br/>action consequence review"]
+  Contracts["Contract validators ON<br/>state and output schema"]
+
+  DSC --> Req
+  DSC --> Evidence
+  PAAP --> Evidence
+  PAAP --> Eval
+  DAR --> Rec
+  Contracts --> Gate
+  Contracts --> Eval
+  Contracts --> Rec
+      </pre>
+    </section>
+
+    <section>
+      <h2>Two-Level Governance</h2>
+      <p>
+        DSC, PAAP, and DAR appear in two places technically. At the global level, <code>LayerConfig</code> enables or
+        disables them for the whole run. At the local level, agents invoke the enabled checks during execution, so
+        validation happens inside the agent workflow rather than only after the workflow finishes.
+      </p>
+      <pre class="mermaid">
+flowchart TB
+  Config["Global control plane<br/>LayerConfig"]
+  Graph["Agent graph runtime"]
+
+  Config -->|"enables / disables"| Graph
+
+  subgraph Agents["Local enforcement inside agents"]
+    Req2["RequirementAgent<br/>DSC scope check"]
+    Ev2["EvidenceAgent<br/>DSC scope check<br/>PAAP evidence check"]
+    Eval2["EvaluationAgent<br/>PAAP evidence check<br/>DAR action check"]
+    Rec2["RecommendationAgent<br/>DAR action check<br/>human gate"]
+  end
+
+  Graph --> Req2 --> Ev2 --> Eval2 --> Rec2
+      </pre>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Level</th>
+            <th>Technical role</th>
+            <th>How to explain it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Global governance layer</td>
+            <td><code>LayerConfig</code> sets <code>dsc_enabled</code>, <code>paap_enabled</code>, <code>dar_enabled</code>, <code>human_gate_enabled</code>, and <code>contract_validators_enabled</code>.</td>
+            <td>This is the experiment control plane. It defines whether the run is A, C, F, or an ablation.</td>
+          </tr>
+          <tr>
+            <td>Inside agents</td>
+            <td>Agents call the enabled governance checks while reading evidence, writing outputs, scoring, or preparing a recommendation.</td>
+            <td>This is the enforcement point. Scope, evidence, and action-safety checks happen during agent execution.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Thesis wording: DSC, PAAP, and DAR are system-wide governance mechanisms with local enforcement points inside
+        agents. They are not independent LLM agents; they are deterministic checks that wrap or gate agent actions.
+      </p>
+    </section>
+
+    <section>
+      <h2>F Run Configuration</h2>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Value in F</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Decision graph</td>
+            <td>Enabled.</td>
+            <td>Runs the procurement workflow as a structured sequence of agents.</td>
+          </tr>
+          <tr>
+            <td>DSC</td>
+            <td><code>true</code></td>
+            <td>Limits the decision to the procurement scope and blocks out-of-scope evidence classes.</td>
+          </tr>
+          <tr>
+            <td>PAAP</td>
+            <td><code>true</code></td>
+            <td>Checks evidence authority, required evidence classes, and evidence sufficiency.</td>
+          </tr>
+          <tr>
+            <td>DAR</td>
+            <td><code>true</code></td>
+            <td>Reviews the consequence class of actions such as scoring vendors or publishing a recommendation.</td>
+          </tr>
+          <tr>
+            <td>Human gate</td>
+            <td><code>true</code></td>
+            <td>Prevents the system from committing to a vendor or spend without explicit human approval.</td>
+          </tr>
+          <tr>
+            <td>Contract validators</td>
+            <td><code>true</code></td>
+            <td>Enforces write scope, required output fields, and structured handoff between agents.</td>
+          </tr>
+          <tr>
+            <td>Local result file</td>
+            <td><code>F.jsonl</code> not present yet.</td>
+            <td>Final statistics should be filled from the recorded F run, not estimated.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>What F Evaluates</h2>
+      <p>
+        F asks whether the complete architecture fixes the two earlier failure modes. A showed that a single informed
+        model call can alternate between Atlas and Helio. C showed that agents can extract better intermediate facts but
+        still fail during state handoff. F should test whether governance turns those intermediate facts into a stable,
+        auditable recommendation.
+      </p>
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Earlier problem</th>
+            <th>F mechanism</th>
+            <th>Expected observable result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A: hard constraints are treated like preferences.</td>
+            <td>Deterministic eligibility gates before scoring.</td>
+            <td>Vendors with hard failures are eliminated before ranking.</td>
+          </tr>
+          <tr>
+            <td>A: evidence authority is inconsistent.</td>
+            <td>PAAP evidence policy.</td>
+            <td>Claims must cite acceptable evidence sources; model inference is not sufficient.</td>
+          </tr>
+          <tr>
+            <td>C: extracted facts do not reliably flow into eligibility.</td>
+            <td>Contract validators and state validation.</td>
+            <td>Empty or malformed candidate lists should block progress instead of silently continuing.</td>
+          </tr>
+          <tr>
+            <td>C: recommendation can be attempted without full audit readiness.</td>
+            <td>DAR plus human gate.</td>
+            <td>The system produces a decision brief for review, not an automatic procurement commitment.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>F Automaton</h2>
+      <p>
+        This is the clean logical automaton for the final architecture. Each transition is allowed only when the
+        previous state has passed its deterministic checks.
+      </p>
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Draft: task received
+  Draft --> Scoped: DSC accepts procurement scope
+  Scoped --> EvidenceCollected: agents collect requirements, market, risk
+  EvidenceCollected --> EvidenceAccepted: PAAP validates evidence classes
+  EvidenceAccepted --> Eligible: hard gates eliminate invalid vendors
+  Eligible --> Scored: surviving vendors scored
+  Scored --> BriefPrepared: DAR allows recommendation brief
+  BriefPrepared --> HumanReview: human gate required
+  HumanReview --> Validated: approval or requested revision recorded
+  Validated --> [*]
+
+  EvidenceCollected --> Blocked: missing evidence
+  Eligible --> Blocked: no eligible vendor
+  BriefPrepared --> Blocked: unsafe action
+  Blocked --> [*]
+      </pre>
+    </section>
+
+    <section>
+      <h2>F Thesis Statement</h2>
+      <p>
+        Condition F is the defensible final architecture: documents are still interpreted by LLM agents, but vendor
+        eligibility, evidence sufficiency, action safety, and human approval are deterministic control points. The LLM
+        helps extract and explain; it does not get unrestricted authority to choose a vendor.
+      </p>
+      <p>
+        For the procurement case, the expected strict result is Atlas as the clean recommendation, with Helio blocked or
+        marked as non-clean because formal Ubuntu 24.04 verification is missing. The final F run should be reported with
+        recorded token usage, completion status, recommended vendor, eliminations, audit receipts, and governance metric
+        values from the produced <code>F.jsonl</code>.
+      </p>
+    </section>
+  </main>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      securityLevel: "loose",
+      themeVariables: {
+        primaryColor: "#edf4f7",
+        primaryTextColor: "#1f2933",
+        primaryBorderColor: "#8aa0af",
+        lineColor: "#526476",
+        secondaryColor: "#ffffff",
+        tertiaryColor: "#f6f7f8",
+        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+      }
+    });
+  </script>
+</body>
+</html>

@@ -6,6 +6,11 @@ __pycache__/
 .venv/
 data/runs/
 data/outcomes.jsonl
+case_studies/*/output/*
+!case_studies/*/output/.gitkeep
+case_studies/*/output/results/
+case_studies/*/output/results/*.jsonl
+**/outputs/
 npm-debug.log*
 .env
 .tmp/

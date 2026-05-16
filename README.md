@@ -1,10 +1,17 @@
 # Benchmark Configs
 
-Run any config with:
+**Single run (one rep, one condition):**
 
-```powershell
-$env:PYTHONPATH='backend/src'
-python -m decision_agent.cli benchmark-config configs/benchmarks/<name>.json
+```bash
+PYTHONPATH=backend/src python -m decision_agent.cli benchmark-config configs/benchmarks/frontier-baseline.json
+```
+
+To run just one rep, temporarily set `"reps": 1` in the config before running.
+
+**Run any config:**
+
+```bash
+PYTHONPATH=backend/src python -m decision_agent.cli benchmark-config configs/benchmarks/<name>.json
 ```
 
 Results land in `data/benchmarks/<benchmark_id>/` as `results.csv` + `summary.json`.
