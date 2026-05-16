@@ -40,8 +40,8 @@ Requesting 100 developer laptops for the new Riga EU office, opening Q3 2026. Ou
 - Spill-resistant keyboard.
 
 ### Operating System
-- Ubuntu 24.04 LTS is our preferred OS. We do NOT use Windows.
-- Linux compatibility is strongly preferred. Confirmed driver support for Wi-Fi, Bluetooth, suspend/resume, and external displays is desirable.
+- Ubuntu 24.04 LTS is our standard OS. We do NOT use Windows. The vendor's hardware must hold official Canonical Ubuntu 24.04 LTS certification. Uncertified hardware is not acceptable — do not recommend any vendor whose model lacks this certification.
+- Linux compatibility is required. Confirmed driver support for Wi-Fi, Bluetooth, suspend/resume, and external displays is mandatory.
 - Vendor must permit self-imaging. BIOS/firmware must not be locked to a specific OS. Secure Boot must be configurable.
 - TPM 2.0 required for LUKS full-disk encryption.
 

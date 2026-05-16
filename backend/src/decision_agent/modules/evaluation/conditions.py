@@ -6,21 +6,11 @@ from typing import Any
 from decision_agent.modules.governance.layer_config import LayerConfig
 
 _FULL_CONDITION_MAP: dict[str, tuple[LayerConfig, str | None]] = {
-    "A0":      (LayerConfig.baseline(), "anthropic"),
-    "A":       (LayerConfig.baseline(), None),
-    "C":       (LayerConfig(dsc_enabled=False, paap_enabled=False, dar_enabled=False,
-                            human_gate_enabled=False, contract_validators_enabled=True), "anthropic"),
-    "F":       (LayerConfig.full(),     "anthropic"),
-    # Ablation conditions: full governance minus one construct
-    "F_no_DSC":  (LayerConfig(dsc_enabled=False, paap_enabled=True, dar_enabled=True,
-                              human_gate_enabled=True, contract_validators_enabled=True), "anthropic"),
-    "F_no_PAAP": (LayerConfig(dsc_enabled=True, paap_enabled=False, dar_enabled=True,
-                              human_gate_enabled=True, contract_validators_enabled=True), "anthropic"),
-    "F_no_DAR":  (LayerConfig(dsc_enabled=True, paap_enabled=True, dar_enabled=False,
-                              human_gate_enabled=True, contract_validators_enabled=True), "anthropic"),
-    # Model comparison conditions
-    "G_qwen":  (LayerConfig.full(),     "ollama/qwen2.5"),
-    "G_llama": (LayerConfig.full(),     "ollama/llama3.1"),
+    "A0": (LayerConfig.baseline(), None),
+    "C":  (LayerConfig(dsc_enabled=False, paap_enabled=False, dar_enabled=False,
+                       human_gate_enabled=False, contract_validators_enabled=True), None),
+    "F":  (LayerConfig(dsc_enabled=True, paap_enabled=True, dar_enabled=True,
+                       human_gate_enabled=False, contract_validators_enabled=True), None),
 }
 
 

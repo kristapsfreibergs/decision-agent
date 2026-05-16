@@ -181,6 +181,24 @@ def _write_case_run_record(
     run_stage: str,
     started_at: str,
 ) -> None:
+    import os
+    from decision_agent.shared.providers.registry import get_provider
+
+    # Capture actual provider and model name
+    provider_obj = get_provider(provider_override)
+    provider_name = provider_override or os.environ.get("MODEL_PROVIDER", "anthropic")
+
+    # Get model name from provider
+    actual_model_name = getattr(provider_obj, '_model', None)
+    if not actual_model_name:
+        # Fallback to env vars by provider type
+        if "openai" in provider_name.lower():
+            actual_model_name = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        elif "anthropic" in provider_name.lower():
+            actual_model_name = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        elif "ollama" in provider_name.lower():
+            actual_model_name = os.environ.get("OLLAMA_MODEL", "")
+
     run_record = {
         "run_id": run_id,
         "case_id": case_id,
@@ -188,7 +206,8 @@ def _write_case_run_record(
         "rep": rep,
         "run_stage": run_stage,
         "started_at": started_at,
-        "model": provider_override,
+        "provider": provider_name,
+        "model_name": actual_model_name,
         "input_hash": input_digest,
         "layer_config": layer_config,
     }

@@ -15,12 +15,24 @@ _MODEL_PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
 
 def model_provider(run_dir: Path) -> str:
     record = _load_run_record(run_dir)
-    return record.get("provider_override") or record.get("model") or "default"
+    provider = record.get("provider") or record.get("provider_override")
+    if provider:
+        return provider
+
+    # Fallback: infer from model name if present
+    model = record.get("model_name") or record.get("model") or ""
+    if "gpt" in model.lower():
+        return "openai"
+    elif "claude" in model.lower():
+        return "anthropic"
+    elif any(x in model.lower() for x in ["qwen", "llama"]):
+        return "ollama"
+    return "default"
 
 
 def model_name(run_dir: Path) -> str:
     record = _load_run_record(run_dir)
-    return str(record.get("model") or record.get("provider_override") or "")
+    return str(record.get("model_name") or record.get("model") or record.get("provider_override") or "")
 
 
 def cost_tokens_total(run_dir: Path) -> int:

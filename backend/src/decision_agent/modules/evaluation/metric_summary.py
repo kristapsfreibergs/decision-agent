@@ -17,13 +17,17 @@ def extract_all_metrics(
     ground_truth: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     record = _load_run_record(run_dir)
+    provider_name = model_provider(run_dir)
+    model = model_name(run_dir)
+
     metrics: dict[str, Any] = {
         "condition": condition,
         "fixture": fixture_id,
         "rep": rep,
         "run_id": record.get("run_id"),
-        "provider": model_provider(run_dir),
-        "model_name": model_name(run_dir),
+        "provider": provider_name,
+        "model": model,
+        "model_settings": _get_model_settings(provider_name, model),
         "scope_violations": scope_violations(run_dir),
         "evidence_types_unrecognized": evidence_types_unrecognized(run_dir),
         "recommendation_traceable": recommendation_traceable(run_dir),
@@ -44,3 +48,40 @@ def extract_all_metrics(
     if ground_truth:
         metrics.update(evaluate_ground_truth(run_dir, ground_truth))
     return metrics
+
+
+def _get_model_settings(provider: str, model: str) -> dict[str, Any]:
+    """Return model configuration settings for the given provider and model from environment/config."""
+    import os
+
+    provider_lower = provider.lower() if provider else ""
+    settings: dict[str, Any] = {
+        "provider": provider,
+        "model": model,
+    }
+
+    if "anthropic" in provider_lower:
+        settings.update({
+            "temperature": 1.0,
+            "top_p": None,
+            "top_k": None,
+            "prompt_caching": os.environ.get("ANTHROPIC_PROMPT_CACHE", "false").lower() == "true",
+            "max_tokens": int(os.environ.get("ANTHROPIC_MAX_TOKENS", "32000")),
+            "timeout_seconds": float(os.environ.get("ANTHROPIC_TIMEOUT_SECONDS", "600")),
+            "sampling_note": "temperature=1.0 (API default, preserves natural variance)"
+        })
+    elif "openai" in provider_lower:
+        settings.update({
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "max_tokens": int(os.environ.get("OPENAI_MAX_TOKENS", "32000")),
+            "sampling_note": "temperature=1.0, top_p=1.0 (full distribution, no nucleus truncation)"
+        })
+    elif "ollama" in provider_lower:
+        settings.update({
+            "temperature": float(os.environ.get("OLLAMA_TEMPERATURE", "1.0")),
+            "endpoint": os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434"),
+            "sampling_note": "Local inference via Ollama"
+        })
+
+    return settings

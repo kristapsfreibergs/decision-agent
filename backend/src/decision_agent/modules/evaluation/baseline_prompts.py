@@ -1,12 +1,10 @@
-"""Static per-domain prompts and output schemas for A0 baseline conditions.
+"""Static per-domain prompts and output schemas for A0 informed baseline.
 
-A0 uses domain-appropriate but governance-free prompts. Dynamic prompt
-construction from domain parameters is a property of the governed
-architecture (Step 3 onward) and is evaluated separately.
+A0 is the informed baseline: it receives the same domain knowledge
+(policy, constraints, vendor facts, etc.) that governed workers use,
+but without runtime enforcement layers.
 
-These prompts are intentionally minimal: one sentence of role context,
-one instruction to output JSON. Not zero context, not optimised context.
-They reflect the minimum a practitioner would write.
+The system prompt defines task role and output contract.
 """
 
 from __future__ import annotations

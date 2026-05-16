@@ -20,7 +20,7 @@ def is_phase_gate_cleared(run: dict[str, Any], phase_id: str | None, gates: list
     """Return True if there is no gate for this phase, or if the gate has been approved.
 
     Phase gates are part of the human_gate governance layer. When that layer
-    is disabled (condition A baseline) the gate does not apply.
+    is disabled the gate does not apply.
     """
     if not phase_id:
         return True

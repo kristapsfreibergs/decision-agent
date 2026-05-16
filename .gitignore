@@ -13,6 +13,7 @@ case_studies/*/output/results/*.jsonl
 **/outputs/
 npm-debug.log*
 .env
+CLAUDE.md
 .tmp/
 .claude/
 .run_logs/
