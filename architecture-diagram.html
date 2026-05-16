@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Decision Agent Logical Architecture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f8;
+      --panel: #ffffff;
+      --ink: #1f2933;
+      --muted: #627184;
+      --line: #d9e0e8;
+      --accent: #176b87;
+      --soft: #edf4f7;
+      --code: #eef2f5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 30px clamp(18px, 4vw, 52px) 22px;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+      padding: 22px clamp(18px, 4vw, 52px) 48px;
+    }
+
+    section,
+    aside {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: clamp(16px, 2vw, 24px);
+      overflow: auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: clamp(20px, 2.4vw, 28px);
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 16px;
+      max-width: 980px;
+      color: var(--muted);
+    }
+
+    code {
+      background: var(--code);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #253545;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .summary div {
+      border-left: 4px solid var(--accent);
+      padding-left: 12px;
+    }
+
+    .summary strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .agent-list {
+      display: grid;
+      gap: 0;
+      margin: 0 0 18px;
+      padding: 0;
+      list-style: none;
+      max-width: 1040px;
+    }
+
+    .agent-list li {
+      display: grid;
+      grid-template-columns: minmax(190px, 270px) 1fr;
+      gap: 12px;
+      padding: 9px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .agent-list li:first-child { border-top: 0; }
+    .agent-list strong { color: var(--ink); }
+    .agent-list span { color: var(--muted); }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 0 0 18px;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfd;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+
+    .step span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .legend-table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .legend-table th,
+    .legend-table td {
+      padding: 8px 10px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .legend-table th {
+      background: var(--code);
+      color: var(--ink);
+    }
+
+    .legend-table td:first-child {
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--ink);
+    }
+
+    .mermaid {
+      min-width: 760px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 720px) {
+      .agent-list li {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+
+      .mermaid {
+        min-width: 680px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Decision Agent Logical Architecture</h1>
+    <p>
+      A compact explanation of the project: a procurement decision is processed by a sequence of agents.
+      Each agent is built from atomic operators, patches shared decision state, and is checked by governance layers.
+    </p>
+  </header>
+
+  <main>
+    <aside class="summary" aria-label="Architecture summary">
+      <div>
+        <strong>One core idea</strong>
+        The system turns a procurement task into a controlled decision pipeline.
+      </div>
+      <div>
+        <strong>Reusable building blocks</strong>
+        Agents are composed from atomic operators such as <code>extract</code>, <code>score</code>, <code>rank</code>, and <code>mem_write</code>.
+      </div>
+      <div>
+        <strong>Control layer</strong>
+        Governance checks evidence scope, evidence quality, authorization, and valid state transitions.
+      </div>
+    </aside>
+
+    <section>
+      <h2>Project Overview</h2>
+      <p>
+        This diagram shows the logical layers only. It avoids HTTP routes and file names so the reader can understand
+        what the project does before reading implementation details.
+      </p>
+      <pre class="mermaid">
+flowchart TB
+  Task["Procurement task<br/>what needs to be decided?"]
+  Graph["Decision graph<br/>ordered agents"]
+  Agents["General agents<br/>requirement, evidence, evaluation, recommendation..."]
+  Operators["Atomic operators<br/>LLM + deterministic + memory"]
+  State["Shared decision state<br/>immutable patches"]
+  Governance["Governance layer<br/>DSC + PAAP + DAR + human gates"]
+  Memory["Cross-run memory<br/>past evidence and rankings"]
+  Output["Decision brief<br/>validated recommendation + audit trail"]
+
+  Task --> Graph
+  Graph --> Agents
+  Agents --> Operators
+  Operators --> State
+  State --> Agents
+  Agents --> Governance
+  Governance --> Output
+  Memory <--> Operators
+  State --> Output
+      </pre>
+    </section>
+
+    <section>
+      <h2>Procurement Decision Flow</h2>
+      <p>
+        The procurement decision graph has nine agents executed in sequence.
+      </p>
+      <ul class="agent-list">
+        <li><strong>RequirementAgent</strong><span>extracts and structures what's being procured</span></li>
+        <li><strong>EvidenceAgent</strong><span>researches market, retrieves prior evidence from memory</span></li>
+        <li><strong>NormalizationAgent</strong><span>standardizes currencies, units, dates</span></li>
+        <li><strong>EligibilityAgent</strong><span>eliminates vendors failing hard constraints</span></li>
+        <li><strong>EvaluationAgent</strong><span>scores and ranks surviving vendors</span></li>
+        <li><strong>ComparisonAgent</strong><span>compares top vendors side by side</span></li>
+        <li><strong>RecommendationAgent</strong><span>produces the decision brief, persists to memory</span></li>
+        <li><strong>StateUpdateAgent</strong><span>finalizes state, persists rankings to memory</span></li>
+        <li><strong>StateValidationAgent</strong><span>validates invariants, records outcome</span></li>
+      </ul>
+      <pre class="mermaid">
+flowchart LR
+  A["1 Requirement"]
+  B["2 Evidence"]
+  C["3 Normalize"]
+  D["4 Eligibility"]
+  E["5 Evaluate"]
+  F["6 Compare"]
+  G["7 Recommend"]
+  H["8 Update State"]
+  I["9 Validate"]
+
+  A --> B --> C --> D --> E --> F --> G --> H --> I
+      </pre>
+    </section>
+
+    <section>
+      <h2>What Agents Are Made Of</h2>
+      <p>
+        Agents are not monolithic. They are short chains of atomic operators. The EvidenceAgent is the clearest example
+        because it combines memory, LLM extraction/classification, deterministic validation, state update, and audit logging.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Mem["mem_search<br/>find past evidence"]
+  Extract["extract<br/>market facts"]
+  Classify["classify<br/>risk and evidence type"]
+  Verify["verify<br/>schema/rule checks"]
+  Normalize["normalize<br/>standard format"]
+  Update["update_state<br/>patch DecisionState"]
+  Log["log<br/>audit event"]
+
+  Mem --> Extract --> Classify --> Verify --> Normalize --> Update --> Log
+      </pre>
+    </section>
+
+    <section>
+      <h2>Finite-State Decision Automaton</h2>
+      <p>
+        This is the finite-state view of one procurement run. A transition fires only when the responsible agent
+        completes its operator chain and the resulting <code>DecisionState</code> patch is accepted.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Start((start))
+  S0((S0<br/>Draft))
+  S1((S1<br/>Requirements))
+  S2((S2<br/>Evidence))
+  S3((S3<br/>Normalized))
+  S4((S4<br/>Eligible))
+  S5((S5<br/>Evaluated))
+  S6((S6<br/>Compared))
+  S7((S7<br/>Recommended))
+  S8((S8<br/>Approved))
+  S9((S9<br/>Updated))
+  S10(((S10<br/>Validated)))
+  Reject((reject))
+  Fail((fail))
+
+  Start -->|task submitted| S0
+  S0 -->|RequirementAgent:<br/>extract + classify| S1
+  S1 -->|EvidenceAgent:<br/>mem_search + extract + verify| S2
+  S2 -->|NormalizationAgent:<br/>standardize facts| S3
+  S3 -->|EligibilityAgent:<br/>check + filter| S4
+  S4 -->|EvaluationAgent:<br/>score + rank| S5
+  S5 -->|ComparisonAgent:<br/>compare trade-offs| S6
+  S6 -->|RecommendationAgent:<br/>brief + mem_write| S7
+  S7 -->|human gate + DAR:<br/>approve| S8
+  S8 -->|StateUpdateAgent:<br/>finalize + mem_write| S9
+  S9 -->|StateValidationAgent:<br/>validate invariants| S10
+
+  S1 -->|missing required evidence| Fail
+  S4 -->|no eligible vendor| Fail
+  S7 -->|human rejects| Reject
+  S9 -->|invalid transition| Fail
+
+  S2 -. reads .-> M[(Memory)]
+  S7 -. writes .-> M
+  S9 -. writes .-> M
+  G[[Governance<br/>DSC / PAAP / DAR]] -. validates .-> S2
+  G -. validates .-> S5
+  G -. validates .-> S7
+  G -. validates .-> S10
+      </pre>
+      <table class="legend-table">
+        <thead>
+          <tr>
+            <th>State</th>
+            <th>Meaning</th>
+            <th>Main state patch</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>S0</td><td>Raw procurement task is accepted.</td><td>Initial <code>DecisionState</code></td></tr>
+          <tr><td>S1</td><td>Requirements are structured.</td><td><code>requirements</code></td></tr>
+          <tr><td>S2</td><td>Market and risk evidence is collected and checked.</td><td><code>evidence</code>, <code>prior_evidence</code></td></tr>
+          <tr><td>S3</td><td>Facts are standardized for comparison.</td><td><code>normalized_data</code></td></tr>
+          <tr><td>S4</td><td>Hard constraints remove invalid vendors.</td><td><code>eligible_options</code></td></tr>
+          <tr><td>S5</td><td>Eligible vendors are scored and ranked.</td><td><code>scores</code>, <code>rankings</code></td></tr>
+          <tr><td>S6</td><td>Top vendors are compared side by side.</td><td><code>comparison</code></td></tr>
+          <tr><td>S7</td><td>Decision brief is produced.</td><td><code>recommendation</code></td></tr>
+          <tr><td>S8</td><td>Human and authorization gates approve proceeding.</td><td><code>authorization_receipts</code></td></tr>
+          <tr><td>S9</td><td>Final state and ranking evidence are persisted.</td><td><code>persisted_evidence_ids</code></td></tr>
+          <tr><td>S10</td><td>Final invariants pass; decision is validated.</td><td>validated outcome and audit trail</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Atomic Operator Families</h2>
+      <p>
+        Operators are the smallest reusable primitives. LLM operators handle language tasks. Deterministic operators
+        handle rules, thresholds, scoring, state changes, and audit. Memory operators connect the current run to past runs.
+      </p>
+      <pre class="mermaid">
+flowchart TB
+  Operators["Atomic operators"]
+
+  LLM["LLM operators<br/>extract, classify, compare,<br/>explain, recommend"]
+  Det["Deterministic operators<br/>verify, normalize, check, score,<br/>filter, rank, log, update_state,<br/>validate_state, monitor_outcome"]
+  Mem["Memory operators<br/>mem_search, mem_write"]
+
+  Operators --> LLM
+  Operators --> Det
+  Operators --> Mem
+      </pre>
+    </section>
+
+    <section>
+      <h2>Shared State Lifecycle</h2>
+      <p>
+        Agents do not mutate shared state directly. Each successful operator returns a state patch. The state machine
+        controls which decision phases are valid.
+      </p>
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> EvidenceIncomplete
+  EvidenceIncomplete --> Eligible
+  Eligible --> Evaluated
+  Evaluated --> Recommended
+  Recommended --> Approved
+  Approved --> StateUpdated
+  StateUpdated --> Validated
+  Validated --> [*]
+      </pre>
+    </section>
+
+    <section>
+      <h2>Governance And Memory</h2>
+      <p>
+        Governance is shown as an overlay rather than as another agent. It validates whether evidence is in scope,
+        whether evidence is strong enough, whether proposed actions are authorized, and whether humans must approve.
+      </p>
+      <pre class="mermaid">
+flowchart LR
+  Agents["Agent pipeline"]
+  State["DecisionState"]
+  Memory["Memory<br/>JSONL evidence from previous runs"]
+  DSC["DSC<br/>scope control"]
+  PAAP["PAAP<br/>evidence scoring"]
+  DAR["DAR<br/>authorization receipt"]
+  Gate["Human gate<br/>approve or reject"]
+  Output["Validated decision brief"]
+
+  Memory <--> Agents
+  Agents --> State
+  State --> DSC --> PAAP --> DAR --> Gate --> Output
+      </pre>
+    </section>
+  </main>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      securityLevel: "loose",
+      themeVariables: {
+        primaryColor: "#edf4f7",
+        primaryTextColor: "#1f2933",
+        primaryBorderColor: "#8aa0af",
+        lineColor: "#526476",
+        secondaryColor: "#ffffff",
+        tertiaryColor: "#f6f7f8",
+        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+      }
+    });
+  </script>
+</body>
+</html>

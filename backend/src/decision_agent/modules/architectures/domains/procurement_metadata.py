@@ -34,6 +34,23 @@ EVIDENCE_PROFILE = {
         "budget_constraints",
         "compliance_rules",
     ],
+    # Structural evidence types: authority is computed from independence tier,
+    # verification depth, and corroboration count — not hardcoded.
+    "evidence_types": {
+        "signed_contract":  {"independence": "authoritative", "default_verification_depth": 3},
+        "approved_spec":    {"independence": "authoritative", "default_verification_depth": 2},
+        "compliance_rule":  {"independence": "authoritative", "default_verification_depth": 2},
+        "budget_approval":  {"independence": "authoritative", "default_verification_depth": 2},
+        "vendor_proposal":  {"independence": "self_reported",  "default_verification_depth": 1},
+        "market_benchmark": {"independence": "independent",    "default_verification_depth": 1},
+        "reference_check":  {"independence": "second_party",   "default_verification_depth": 1},
+        "analyst_estimate": {"independence": "self_reported",  "default_verification_depth": 0},
+        "model_inference":  {"independence": "",               "default_verification_depth": 0},
+    },
+    # Legacy authority_weights kept for backward compatibility with tests and
+    # any external tooling that reads the profile.  New scoring uses
+    # evidence_types above; these weights are only used when evidence_types
+    # is absent.
     "authority_weights": {
         "signed_contract":       1.00,
         "approved_spec":         0.95,
@@ -58,8 +75,8 @@ EVIDENCE_PROFILE = {
 
 SCOPE_PROFILE = {
     "allowed_evidence_classes": [
-        name for name, weight in EVIDENCE_PROFILE["authority_weights"].items()
-        if float(weight) > 0.0
+        name for name, props in EVIDENCE_PROFILE["evidence_types"].items()
+        if props.get("independence", "")  # empty independence = blocked (model_inference)
     ],
     "required_evidence_classes": [
         "compliance_rule",

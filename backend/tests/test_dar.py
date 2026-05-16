@@ -93,11 +93,14 @@ class TestEvaluateAction(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.run_id = "run_dar_test"
-        # Persist three high-authority sources so floor is met
+        # Persist five high-authority sources so floor is met
+        # (corroboration formula 1-e^(-0.4*count) requires ≥4 peers to clear 0.6)
         sources = [
             EvidenceSource(id="a", type="signed_contract", excerpt="", created_at="2026-05-01"),
             EvidenceSource(id="b", type="approved_spec", excerpt="", created_at="2026-05-01"),
             EvidenceSource(id="c", type="compliance_rule", excerpt="", created_at="2026-05-01"),
+            EvidenceSource(id="d", type="vendor_proposal", excerpt="", created_at="2026-05-01"),
+            EvidenceSource(id="e", type="vendor_proposal", excerpt="", created_at="2026-05-01"),
         ]
         from datetime import datetime, timezone
         record = score_record(sources, PROFILE, datetime(2026, 5, 7, tzinfo=timezone.utc), worker_id="evaluator")
@@ -120,7 +123,7 @@ class TestEvaluateAction(unittest.TestCase):
             worker_id="recommender",
             action_type="publish_recommendation",
             target="VendorX",
-            claimed_evidence_ids=("a", "b", "c"),
+            claimed_evidence_ids=("a", "b", "c", "d", "e"),
             proposed_at="2026-05-07T12:00:00Z",
         )
         receipt = evaluate_action(proposal, contract, self.root)

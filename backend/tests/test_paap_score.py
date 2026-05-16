@@ -102,20 +102,22 @@ class TestPureFormulaDeterminism(unittest.TestCase):
         self.assertGreater(many.breakdown["a"]["corroboration"], single.breakdown["a"]["corroboration"])
 
     def test_high_authority_recent_sources_pass_threshold(self) -> None:
-        # Three corroborating high-authority recent sources; corroboration boost
-        # pushes record_score above the 0.6 threshold.
+        # Five corroborating high-authority recent sources; corroboration
+        # with diminishing returns pushes record_score above the 0.6 threshold.
         sources = [
             EvidenceSource(id="a", type="signed_contract", excerpt="", created_at="2026-05-01"),
             EvidenceSource(id="b", type="approved_spec", excerpt="", created_at="2026-05-01"),
             EvidenceSource(id="c", type="compliance_rule", excerpt="", created_at="2026-05-01"),
+            EvidenceSource(id="d", type="budget_approval", excerpt="", created_at="2026-05-01"),
+            EvidenceSource(id="e", type="market_benchmark", excerpt="", created_at="2026-05-01"),
         ]
         record = score_record(sources, PROCUREMENT_PROFILE, NOW)
         self.assertGreaterEqual(record.score, PROCUREMENT_PROFILE["min_avg_score"])
         self.assertEqual(threshold_issues(record, PROCUREMENT_PROFILE), [])
 
     def test_two_high_authority_sources_below_threshold_corroboration_too_low(self) -> None:
-        # Two sources gives corroboration=0.6 → cannot clear threshold even
-        # with perfect authority. Forces real evidence stacking.
+        # Two sources: corroboration with diminishing returns formula is low
+        # → cannot clear threshold even with perfect authority.
         sources = [
             EvidenceSource(id="a", type="signed_contract", excerpt="", created_at="2026-05-01"),
             EvidenceSource(id="b", type="approved_spec", excerpt="", created_at="2026-05-01"),
@@ -183,6 +185,8 @@ class TestEvaluatePaap(unittest.TestCase):
                     {"id": "s1", "type": "signed_contract", "created_at": "2026-05-01"},
                     {"id": "s2", "type": "approved_spec", "created_at": "2026-05-01"},
                     {"id": "s3", "type": "compliance_rule", "created_at": "2026-05-01"},
+                    {"id": "s4", "type": "budget_approval", "created_at": "2026-05-01"},
+                    {"id": "s5", "type": "market_benchmark", "created_at": "2026-05-01"},
                 ],
             }
             issues, record = evaluate_paap(output, contract, project_root=root, now_utc=NOW)
@@ -202,6 +206,8 @@ class TestEvidenceFloorMet(unittest.TestCase):
                 EvidenceSource(id="a", type="signed_contract", excerpt="", created_at="2026-05-01"),
                 EvidenceSource(id="b", type="approved_spec", excerpt="", created_at="2026-05-01"),
                 EvidenceSource(id="c", type="compliance_rule", excerpt="", created_at="2026-05-01"),
+                EvidenceSource(id="d", type="budget_approval", excerpt="", created_at="2026-05-01"),
+                EvidenceSource(id="e", type="market_benchmark", excerpt="", created_at="2026-05-01"),
             ]
             record = score_record(sources, PROCUREMENT_PROFILE, NOW, worker_id="evaluator")
             persist_evidence_record(record, "run_x", runs_dir)
@@ -214,6 +220,121 @@ class TestEvidenceFloorMet(unittest.TestCase):
             met, mean = evidence_floor_met("nope", Path(tmp), PROCUREMENT_PROFILE)
             self.assertFalse(met)
             self.assertEqual(mean, 0.0)
+
+
+STRUCTURAL_PROFILE = {
+    "evidence_types": {
+        "signed_contract":  {"independence": "authoritative", "default_verification_depth": 3},
+        "approved_spec":    {"independence": "authoritative", "default_verification_depth": 2},
+        "compliance_rule":  {"independence": "authoritative", "default_verification_depth": 2},
+        "vendor_proposal":  {"independence": "self_reported",  "default_verification_depth": 1},
+        "market_benchmark": {"independence": "independent",    "default_verification_depth": 1},
+        "analyst_estimate": {"independence": "self_reported",  "default_verification_depth": 0},
+        "model_inference":  {"independence": "",               "default_verification_depth": 0},
+    },
+    "conflict_rules": [],
+    "min_avg_score": 0.5,
+    "min_individual_score": 0.25,
+    "temporal_half_life_days": 365,
+}
+
+
+class TestStructuralAuthority(unittest.TestCase):
+    def test_authoritative_scores_higher_than_self_reported(self) -> None:
+        auth = score_record(
+            [EvidenceSource(id="a", type="signed_contract", excerpt="", created_at="2026-05-01")],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        self_rep = score_record(
+            [EvidenceSource(id="b", type="vendor_proposal", excerpt="", created_at="2026-05-01")],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        self.assertGreater(auth.score, self_rep.score)
+
+    def test_model_inference_scores_zero_structural(self) -> None:
+        record = score_record(
+            [EvidenceSource(id="m", type="model_inference", excerpt="", created_at="2026-05-01")],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        self.assertAlmostEqual(record.breakdown["m"]["authority"], 0.0)
+
+    def test_verification_depth_increases_authority(self) -> None:
+        shallow = score_record(
+            [EvidenceSource(id="a", type="vendor_proposal", excerpt="", created_at="2026-05-01",
+                            independence="self_reported", verification_depth=0)],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        deep = score_record(
+            [EvidenceSource(id="a", type="vendor_proposal", excerpt="", created_at="2026-05-01",
+                            independence="self_reported", verification_depth=3)],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        self.assertGreater(deep.score, shallow.score)
+
+    def test_source_independence_overrides_profile_default(self) -> None:
+        """When source declares independence, it takes precedence over profile default."""
+        # vendor_proposal defaults to self_reported in profile, but source says independent
+        upgraded = score_record(
+            [EvidenceSource(id="a", type="vendor_proposal", excerpt="", created_at="2026-05-01",
+                            independence="independent", verification_depth=2)],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        default = score_record(
+            [EvidenceSource(id="a", type="vendor_proposal", excerpt="", created_at="2026-05-01")],
+            STRUCTURAL_PROFILE, NOW,
+        )
+        self.assertGreater(upgraded.score, default.score)
+
+    def test_independence_ordering_is_strict(self) -> None:
+        """authoritative > independent > second_party > self_reported."""
+        from decision_agent.modules.governance.paap_score import INDEPENDENCE_TIERS
+        tiers = list(INDEPENDENCE_TIERS.values())
+        for i in range(len(tiers) - 1):
+            self.assertLess(tiers[i], tiers[i + 1])
+
+    def test_corroboration_diminishing_returns(self) -> None:
+        """More sources increase score, but with diminishing returns."""
+        scores = []
+        for n in [1, 3, 5, 10]:
+            sources = [
+                EvidenceSource(id=f"s{i}", type="approved_spec", excerpt="", created_at="2026-05-01")
+                for i in range(n)
+            ]
+            record = score_record(sources, STRUCTURAL_PROFILE, NOW)
+            scores.append(record.score)
+        # Each additional batch gives less marginal improvement
+        gain_1_to_3 = scores[1] - scores[0]
+        gain_3_to_5 = scores[2] - scores[1]
+        gain_5_to_10 = scores[3] - scores[2]
+        self.assertGreater(gain_1_to_3, gain_3_to_5)
+        self.assertGreater(gain_3_to_5, gain_5_to_10)
+
+    def test_structural_deterministic(self) -> None:
+        sources = [
+            EvidenceSource(id="a", type="signed_contract", excerpt="", created_at="2026-05-01",
+                           independence="authoritative", verification_depth=3),
+            EvidenceSource(id="b", type="vendor_proposal", excerpt="", created_at="2026-05-01",
+                           independence="self_reported", verification_depth=1),
+        ]
+        a = score_record(sources, STRUCTURAL_PROFILE, NOW)
+        b = score_record(sources, STRUCTURAL_PROFILE, NOW)
+        self.assertEqual(a.score, b.score)
+        self.assertEqual(a.breakdown, b.breakdown)
+
+    def test_coerce_source_parses_structural_fields(self) -> None:
+        raw = {
+            "id": "x", "type": "vendor_proposal", "excerpt": "v",
+            "independence": "self_reported", "verification_depth": 2,
+        }
+        s = coerce_source(raw)
+        self.assertEqual(s.independence, "self_reported")
+        self.assertEqual(s.verification_depth, 2)
+
+    def test_coerce_source_defaults_structural_fields(self) -> None:
+        raw = {"id": "x", "type": "vendor_proposal"}
+        s = coerce_source(raw)
+        self.assertEqual(s.independence, "")
+        self.assertEqual(s.verification_depth, 0)
 
 
 if __name__ == "__main__":

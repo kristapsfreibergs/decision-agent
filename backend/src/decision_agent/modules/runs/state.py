@@ -72,6 +72,16 @@ WORKER_COST = "worker_cost"
 # retry events
 WORKER_RETRY_STARTED = "worker_retry_started"
 
+# decision graph events
+AGENT_STARTED = "agent_started"
+AGENT_COMPLETED = "agent_completed"
+AGENT_FAILED = "agent_failed"
+OPERATOR_COMPLETED = "operator_completed"
+STATE_TRANSITIONED = "state_transitioned"
+MEMORY_SEARCHED = "memory_searched"
+EVIDENCE_PERSISTED = "evidence_persisted"
+DECISION_OUTCOME_RECORDED = "decision_outcome_recorded"
+
 # ---------------------------------------------------------------------------
 # Run statuses (derived)
 # ---------------------------------------------------------------------------

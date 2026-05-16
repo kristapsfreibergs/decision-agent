@@ -38,16 +38,17 @@ from decision_agent.shared.providers.base import LLMProvider
 
 _TODAY = "2026-05-09"
 
-# 4 corroborating high-authority recent sources:
-# - signed_contract (1.00), approved_spec (0.95), compliance_rule (0.95), vendor_proposal (0.70)
-# - temporal ~1.0 (same day), corroboration 0.80 (3 other high sources each)
-# - record_score ~0.72 > min_avg_score 0.50 ✓
+# 5 corroborating high-authority recent sources:
+# - With structural scoring (independence × verification_depth × corroboration),
+#   5 sources ensure corroboration clears diminishing-returns curve and all
+#   individual scores exceed min_individual_score 0.25.
 # - vendor_proposal satisfies DSC required_evidence_classes ["compliance_rule", "vendor_proposal"]
 EVIDENCE_SOURCES = [
     {"id": "e1", "type": "signed_contract",  "excerpt": "Lenovo EMEA signed agreement 2026", "created_at": _TODAY},
     {"id": "e2", "type": "approved_spec",    "excerpt": "Approved procurement spec EUR 200k ceiling", "created_at": _TODAY},
     {"id": "e3", "type": "compliance_rule",  "excerpt": "ISO 27001 mandatory per compliance checklist", "created_at": _TODAY},
     {"id": "e4", "type": "vendor_proposal",  "excerpt": "Lenovo proposal EUR 1799/unit, 6-week delivery", "created_at": _TODAY},
+    {"id": "e5", "type": "budget_approval",  "excerpt": "CFO approved EUR 200k procurement budget", "created_at": _TODAY},
 ]
 
 WORKER_OUTPUTS: dict[str, dict[str, Any]] = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -10,8 +11,25 @@ DEFAULT_MIN_AVG_SCORE = 0.6
 DEFAULT_MIN_INDIVIDUAL_SCORE = 0.4
 HIGH_AUTHORITY_THRESHOLD = 0.6
 CONFLICT_PENALTY_PER_RULE = 0.25
-CORROBORATION_BONUS_PER_SOURCE = 0.1
-CORROBORATION_BASE = 0.5
+CORROBORATION_SATURATION = 0.4
+
+# ---------------------------------------------------------------------------
+# Source independence tiers — epistemically ordered.
+# The ordering is unambiguous: authoritative > independent > second_party >
+# self_reported.  The specific values are a justified calibration; see thesis
+# Section 7.3 for discussion.
+# ---------------------------------------------------------------------------
+INDEPENDENCE_TIERS: dict[str, float] = {
+    "self_reported": 0.30,
+    "second_party": 0.55,
+    "independent": 0.80,
+    "authoritative": 1.00,
+}
+
+# Verification depth bonus: each verified link in the trust chain adds 0.15.
+# depth 0 = bare claim, 1 = document seen, 2 = source validated, 3 = chain complete.
+VERIFICATION_BONUS_PER_DEPTH = 0.15
+MAX_VERIFICATION_DEPTH = 3
 
 
 @dataclass(frozen=True)
@@ -20,6 +38,8 @@ class EvidenceSource:
     type: str
     excerpt: str = ""
     created_at: str | None = None
+    independence: str = ""
+    verification_depth: int = 0
 
 
 @dataclass(frozen=True)
@@ -70,9 +90,36 @@ def _conflict_factor(source_type: str, conflict_rules: list[Any]) -> float:
     return max(0.0, 1.0 - CONFLICT_PENALTY_PER_RULE * triggered)
 
 
-def _corroboration_factor(this_authority: float, others_high_count: int) -> float:
-    """0.5 base + 0.1 per other source with authority >= 0.6, capped at 1.0."""
-    return min(1.0, CORROBORATION_BASE + CORROBORATION_BONUS_PER_SOURCE * others_high_count)
+def _corroboration_factor(corroboration_count: int) -> float:
+    """Diminishing returns: 1 - e^(-0.4 * count). 0 sources → 0.0, 1 → 0.33, 3 → 0.70, 5 → 0.86."""
+    if corroboration_count <= 0:
+        return 0.0
+    return 1.0 - math.exp(-CORROBORATION_SATURATION * corroboration_count)
+
+
+def _structural_authority(source: EvidenceSource, evidence_types: dict[str, dict[str, Any]]) -> float:
+    """Compute authority from structural properties instead of hardcoded weights.
+
+    authority = independence_score × (1 + VERIFICATION_BONUS × depth)
+
+    Independence and verification_depth come from:
+    1. The source itself (if the LLM extracted them)
+    2. The evidence_types declaration in the profile (fallback)
+    """
+    # Resolve independence tier
+    independence = source.independence
+    if not independence and source.type in evidence_types:
+        independence = evidence_types[source.type].get("independence", "")
+    independence_score = INDEPENDENCE_TIERS.get(independence, 0.0)
+
+    # Resolve verification depth
+    depth = source.verification_depth
+    if depth == 0 and source.type in evidence_types:
+        depth = int(evidence_types[source.type].get("default_verification_depth", 0))
+    depth = min(depth, MAX_VERIFICATION_DEPTH)
+
+    verification_bonus = 1.0 + VERIFICATION_BONUS_PER_DEPTH * depth
+    return independence_score * verification_bonus
 
 
 def score_record(
@@ -81,8 +128,17 @@ def score_record(
     now_utc: datetime,
     worker_id: str = "",
 ) -> EvidenceRecord:
-    """Pure deterministic scoring. Same inputs always produce the same record."""
-    weights: dict[str, float] = profile.get("authority_weights") or {}
+    """Pure deterministic scoring. Same inputs always produce the same record.
+
+    Authority is computed from structural properties (independence tier,
+    verification depth, corroboration count) when ``evidence_types`` is
+    declared in the profile.  Falls back to legacy ``authority_weights``
+    lookup for backward compatibility.
+    """
+    legacy_weights: dict[str, float] = profile.get("authority_weights") or {}
+    evidence_types: dict[str, dict[str, Any]] = profile.get("evidence_types") or {}
+    use_structural = bool(evidence_types)
+
     half_life = float(profile.get("temporal_half_life_days") or DEFAULT_HALF_LIFE_DAYS)
     conflict_rules = profile.get("conflict_rules") or []
     min_avg = float(profile.get("min_avg_score") or DEFAULT_MIN_AVG_SCORE)
@@ -98,25 +154,32 @@ def score_record(
             profile_thresholds={"min_avg_score": min_avg, "min_individual_score": min_ind},
         )
 
-    n_high_total = sum(
-        1 for s in sources if float(weights.get(s.type, 0.0)) >= HIGH_AUTHORITY_THRESHOLD
-    )
+    # Compute authority for each source
+    authorities: dict[str, float] = {}
+    for source in sources:
+        if use_structural:
+            authorities[source.id] = _structural_authority(source, evidence_types)
+        else:
+            authorities[source.id] = float(legacy_weights.get(source.type, 0.0))
+
+    # Count corroborating sources (other sources with authority >= threshold)
+    n_high_total = sum(1 for a in authorities.values() if a >= HIGH_AUTHORITY_THRESHOLD)
 
     breakdown: dict[str, dict[str, float]] = {}
     source_scores: list[float] = []
     for source in sources:
-        authority = float(weights.get(source.type, 0.0))
+        authority = authorities[source.id]
         temporal = _temporal_factor(source.created_at, now_utc, half_life)
         conflict = _conflict_factor(source.type, conflict_rules)
         others_high = max(0, n_high_total - (1 if authority >= HIGH_AUTHORITY_THRESHOLD else 0))
-        corroboration = _corroboration_factor(authority, others_high)
-        source_score = authority * temporal * conflict * corroboration
+        corroboration = _corroboration_factor(others_high)
+        source_score = authority * temporal * conflict * max(corroboration, 0.01)
         breakdown[source.id] = {
-            "authority": authority,
-            "temporal": temporal,
-            "conflict": conflict,
-            "corroboration": corroboration,
-            "source_score": source_score,
+            "authority": round(authority, 4),
+            "temporal": round(temporal, 4),
+            "conflict": round(conflict, 4),
+            "corroboration": round(corroboration, 4),
+            "source_score": round(source_score, 4),
         }
         source_scores.append(source_score)
 
@@ -171,11 +234,18 @@ def coerce_source(raw: Any, fallback_index: int = 0) -> EvidenceSource | None:
         if not identifier:
             seed = json.dumps(raw, sort_keys=True, ensure_ascii=False, default=str)
             identifier = f"src_{fallback_index}_{abs(hash(seed)) % 100000}"
+        independence = str(raw.get("independence", "")).strip()
+        try:
+            verification_depth = int(raw.get("verification_depth", 0))
+        except (TypeError, ValueError):
+            verification_depth = 0
         return EvidenceSource(
             id=str(identifier),
             type=type_value,
             excerpt=str(raw.get("excerpt", "")),
             created_at=raw.get("created_at"),
+            independence=independence,
+            verification_depth=verification_depth,
         )
     if isinstance(raw, str):
         type_value = raw.strip()

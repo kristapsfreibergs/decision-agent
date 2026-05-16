@@ -173,6 +173,42 @@ def _run_informed_plain_model(
     append_audit_event(audit_path, {"event": "run_completed", "run_id": run_id, "condition": "A0_inf"})
 
 
+def _execute_graph(
+    run_id: str,
+    root: Path,
+    provider_override: str | None,
+    audit_path: Path,
+    task_context: dict[str, Any] | None = None,
+    layer_config: Any | None = None,
+    memory: Any | None = None,
+) -> None:
+    from decision_agent.modules.governance.layer_config import LayerConfig
+    from decision_agent.modules.graph.domain_graphs.procurement import build_procurement_graph
+    from decision_agent.modules.graph.executor import GraphExecutor
+    from decision_agent.modules.operators.base import OperatorContext
+
+    provider = get_provider(provider_override)
+    if isinstance(layer_config, dict):
+        cfg = LayerConfig.from_dict(layer_config)
+    elif isinstance(layer_config, LayerConfig):
+        cfg = layer_config
+    else:
+        cfg = LayerConfig.full()
+
+    graph = build_procurement_graph(run_id, task_context=task_context)
+    context = OperatorContext(
+        run_id=run_id,
+        agent_id="graph_executor",
+        project_root=root,
+        audit_path=audit_path,
+        provider=provider,
+        layer_config=cfg,
+        memory=memory,
+    )
+    executor = GraphExecutor()
+    executor.execute(graph, context)
+
+
 def _apply_evidence_overrides(run_id: str, root: Path, overrides: dict[str, Any]) -> None:
     contracts_dir = root / "data" / "runs" / run_id / "generated-contracts"
     if not contracts_dir.exists():
