@@ -2,7 +2,7 @@
   "name": "frontier_governed_max",
   "description": "Compliance-coverage frontier: governed stack at maximum PAAP strictness (min_avg_score=0.95). Near-perfect evidence required — almost all runs will be blocked at the evidence gate unless workers produce three or more high-authority, recent, corroborating sources. Expected: very low coverage (most runs abstain), zero scope violations, zero unsafe_approvals. Maps to the extreme strict end of the frontier. This config reproduces the Banking77/AG-News result from the PDF paper where coverage drops to near-zero with strict governance. Useful for demonstrating that governance is a tunable tradeoff, not a free improvement.",
   "conditions": ["F"],
-  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "fixtures": ["procurement_laptops"],
   "reps": 5,
   "timeout_seconds": 900,
   "paap_min_avg_score": 0.95

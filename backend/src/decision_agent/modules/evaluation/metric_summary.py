@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from decision_agent.modules.evaluation.governance_metrics import audit_completeness, authorization_receipt_present, evidence_completeness, scope_violations, unsafe_action_count, unsafe_approvals
+from decision_agent.modules.evaluation.ground_truth_metrics import evaluate_ground_truth
 from decision_agent.modules.evaluation.metric_loaders import _load_run_record
 from decision_agent.modules.evaluation.quality_metrics import evidence_types_unrecognized, output_quality, recommendation_traceable, run_completed
 from decision_agent.modules.evaluation.runtime_metrics import cost_tokens_total, model_provider, time_to_complete, worker_latency_p50_ms
@@ -13,9 +14,10 @@ def extract_all_metrics(
     condition: str,
     rep: int,
     fixture_id: str,
+    ground_truth: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     record = _load_run_record(run_dir)
-    return {
+    metrics: dict[str, Any] = {
         "condition": condition,
         "fixture": fixture_id,
         "rep": rep,
@@ -35,3 +37,6 @@ def extract_all_metrics(
         "cost_tokens_total": cost_tokens_total(run_dir),
         "worker_latency_p50_ms": worker_latency_p50_ms(run_dir),
     }
+    if ground_truth:
+        metrics.update(evaluate_ground_truth(run_dir, ground_truth))
+    return metrics

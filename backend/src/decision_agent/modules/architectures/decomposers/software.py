@@ -100,8 +100,8 @@ def decompose_software_task(
                     _phase_for_slot(topology, ("review", "verify", "converge", "decide", "adjudicate", "gate"), fallback=-1),
                     "validation",
                     f"{task_context}\n\nValidate the implementation with focused tests. Use list_files and read_file to understand what was changed, then write_file to write or update test files.",
-                    ["backend/src/**", "backend/tests/**", "archive/public/**"],
-                    ["backend/tests/**"],
+                    ["backend/src/**", "tests/**", "archive/public/**"],
+                    ["tests/**"],
                     ["read_file", "write_file", "list_files"],
                     ["tests_run"],
                     ["summary", "files_changed", "test_commands"],
@@ -128,4 +128,3 @@ def decompose_software_task(
         "package_outline": package_outline,
         "worker_count_reasoning": worker_count_reasoning,
     }
-

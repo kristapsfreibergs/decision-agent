@@ -2,7 +2,7 @@
   "name": "frontier_baseline",
   "description": "Compliance-coverage frontier: flat baseline (A0). Single LLM call, no architecture, no governance. Produces the baseline point on the compliance-coverage plot. Expected: high coverage (model always answers), high scope violations, zero unsafe_approvals (no DAR — not because governance is good, but because governance doesn't exist). Run alongside frontier-governed-*.json configs to compare at matched coverage levels.",
   "conditions": ["A0"],
-  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "fixtures": ["procurement_laptops"],
   "reps": 5,
   "timeout_seconds": 120
 }

@@ -1,0 +1,16 @@
+{
+  "read_paths": {
+    "requirement_analyst": [
+      "requirements/internal_laptop_policy.md"
+    ],
+    "market_scout": [
+      "markets/eu_laptop_vendors_2026.md"
+    ],
+    "risk_assessor": [
+      "risk-register/hardware_procurement_risks.md"
+    ],
+    "evaluator": [
+      "evaluation-criteria/standard_scoring_rubric.md"
+    ]
+  }
+}

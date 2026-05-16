@@ -66,7 +66,7 @@ Re-run it here only for a consistent rep count across the frontier dataset.
   "name": "string — used in benchmark_id slug",
   "description": "string — documentation only",
   "conditions": ["A0", "A", "C", "F"],
-  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "fixtures": ["procurement_laptops"],
   "reps": 3,
   "timeout_seconds": 600,
   "paap_min_avg_score": 0.6

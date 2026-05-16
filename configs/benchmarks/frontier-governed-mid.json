@@ -2,7 +2,7 @@
   "name": "frontier_governed_mid",
   "description": "Compliance-coverage frontier: governed stack at default PAAP strictness (min_avg_score=0.6). This is the default operating point from the main ablation benchmark. Expected: moderate coverage, zero scope violations, DAR receipts present. Centre point on the compliance-coverage frontier. The main ablation benchmark already produced this result; re-run here for a consistent frontier dataset with the same fixtures and rep count as the other frontier configs.",
   "conditions": ["F"],
-  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "fixtures": ["procurement_laptops"],
   "reps": 5,
   "timeout_seconds": 900,
   "paap_min_avg_score": 0.6

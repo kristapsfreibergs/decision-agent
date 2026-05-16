@@ -12,6 +12,18 @@ from decision_agent.modules.state.decision_state import DecisionState
 from decision_agent.shared.audit_log import append_audit_event
 
 
+def _resolve_run_dir(context: OperatorContext) -> Path:
+    """Resolve the run output directory.
+
+    If context has a ``run_dir`` policy, artifacts go there directly.
+    Otherwise falls back to the legacy ``project_root/data/runs/run_id/`` layout.
+    """
+    override = context.policies.get("run_dir")
+    if override:
+        return Path(override)
+    return context.project_root / "data" / "runs" / context.run_id
+
+
 @dataclass
 class ExecutionResult:
     success: bool
@@ -24,6 +36,8 @@ class GraphExecutor:
     def execute(self, graph: DecisionGraph, context: OperatorContext) -> ExecutionResult:
         state = graph.initial_state
         agent_results: list[AgentResult] = []
+        rd = _resolve_run_dir(context)
+        rd.mkdir(parents=True, exist_ok=True)
 
         for agent_id in graph.topological_order():
             agent = graph.agents[agent_id]
@@ -46,10 +60,7 @@ class GraphExecutor:
             result = agent.run(state, agent_context)
             agent_results.append(result)
 
-            # Write agent output
-            self._persist_agent_output(
-                context.project_root, context.run_id, agent_id, result,
-            )
+            self._persist_agent_output(rd, agent_id, result)
 
             if not result.success:
                 append_audit_event(
@@ -79,8 +90,7 @@ class GraphExecutor:
                 },
             )
 
-        # Persist final decision state
-        self._persist_decision_state(context.project_root, context.run_id, state)
+        self._persist_decision_state(rd, state)
 
         return ExecutionResult(
             success=True,
@@ -90,12 +100,11 @@ class GraphExecutor:
 
     def _persist_agent_output(
         self,
-        project_root: Path,
-        run_id: str,
+        run_dir: Path,
         agent_id: str,
         result: AgentResult,
     ) -> None:
-        out_dir = project_root / "data" / "runs" / run_id / "outputs"
+        out_dir = run_dir / "outputs"
         out_dir.mkdir(parents=True, exist_ok=True)
         data: dict[str, Any] = {
             "agent_id": agent_id,
@@ -113,11 +122,9 @@ class GraphExecutor:
 
     def _persist_decision_state(
         self,
-        project_root: Path,
-        run_id: str,
+        run_dir: Path,
         state: DecisionState,
     ) -> None:
-        run_dir = project_root / "data" / "runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "decision-state.json").write_text(
             json.dumps(state.to_dict(), indent=2, ensure_ascii=False) + "\n",

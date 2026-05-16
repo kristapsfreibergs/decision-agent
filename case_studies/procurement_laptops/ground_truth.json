@@ -1,0 +1,18 @@
+{
+  "expected_outcome": "recommend_vendor",
+  "acceptable_vendors": ["Lenovo"],
+  "expected_eliminations": [
+    {"vendor": "Apple", "reason": "budget"}
+  ],
+  "expected_risk_rating": "MEDIUM",
+  "expected_escalation": false,
+  "must_detect_constraints": [
+    "budget_ceiling",
+    "gdpr_compliance",
+    "eu_warehouse",
+    "iso_27001",
+    "3_year_onsite_warranty"
+  ],
+  "required_evidence_types": ["compliance_rule", "vendor_proposal"],
+  "notes": "Lenovo wins on price and compliance. Apple eliminated on budget ceiling. Dell is acceptable reserve. Budget is tight but achievable with volume discount."
+}

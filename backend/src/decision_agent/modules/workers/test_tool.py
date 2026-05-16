@@ -9,12 +9,12 @@ def _run_tests(command: str, project_root: Path) -> subprocess.CompletedProcess[
     env = os.environ.copy()
     allowed_commands = {
         "npm test": (["npm", "test"], {}),
-        "python3 -m unittest discover backend/tests": (
-            ["python3", "-m", "unittest", "discover", "backend/tests"],
+        "python3 -m unittest discover tests": (
+            ["python3", "-m", "unittest", "discover", "tests"],
             {"PYTHONPATH": "backend/src"},
         ),
-        "PYTHONPATH=backend/src python3 -m unittest discover backend/tests": (
-            ["python3", "-m", "unittest", "discover", "backend/tests"],
+        "PYTHONPATH=backend/src python3 -m unittest discover tests": (
+            ["python3", "-m", "unittest", "discover", "tests"],
             {"PYTHONPATH": "backend/src"},
         ),
     }

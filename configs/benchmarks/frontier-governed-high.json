@@ -2,7 +2,7 @@
   "name": "frontier_governed_high",
   "description": "Compliance-coverage frontier: governed stack at high PAAP strictness (min_avg_score=0.8). Strict evidence threshold — workers that cite weak or insufficient evidence are rejected, forcing the run to abstain or fail. Expected: lower coverage (some runs blocked at evidence check), zero scope violations, zero unsafe_approvals. Maps to the strict end of the frontier: perfect compliance at cost of reduced completion. Compare with frontier-governed-low.json and frontier-baseline.json.",
   "conditions": ["F"],
-  "fixtures": ["procurement_laptops", "procurement_consulting"],
+  "fixtures": ["procurement_laptops"],
   "reps": 5,
   "timeout_seconds": 900,
   "paap_min_avg_score": 0.8

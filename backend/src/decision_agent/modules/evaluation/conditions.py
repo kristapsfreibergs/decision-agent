@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 from typing import Any
 
 from decision_agent.modules.governance.layer_config import LayerConfig
@@ -14,6 +12,14 @@ _FULL_CONDITION_MAP: dict[str, tuple[LayerConfig, str | None]] = {
     "C":       (LayerConfig(dsc_enabled=False, paap_enabled=False, dar_enabled=False,
                             human_gate_enabled=False, contract_validators_enabled=True), "anthropic"),
     "F":       (LayerConfig.full(),     "anthropic"),
+    # Ablation conditions: full governance minus one construct
+    "F_no_DSC":  (LayerConfig(dsc_enabled=False, paap_enabled=True, dar_enabled=True,
+                              human_gate_enabled=True, contract_validators_enabled=True), "anthropic"),
+    "F_no_PAAP": (LayerConfig(dsc_enabled=True, paap_enabled=False, dar_enabled=True,
+                              human_gate_enabled=True, contract_validators_enabled=True), "anthropic"),
+    "F_no_DAR":  (LayerConfig(dsc_enabled=True, paap_enabled=True, dar_enabled=False,
+                              human_gate_enabled=True, contract_validators_enabled=True), "anthropic"),
+    # Model comparison conditions
     "G_qwen":  (LayerConfig.full(),     "ollama/qwen2.5"),
     "G_llama": (LayerConfig.full(),     "ollama/llama3.1"),
 }
@@ -53,15 +59,14 @@ class _ConditionMapView:
 
 CONDITION_MAP: Any = _ConditionMapView()
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-
 
 def list_fixtures() -> list[str]:
-    return sorted(p.stem for p in FIXTURES_DIR.glob("*.json"))
+    """List available case studies (delegates to case_study module)."""
+    from decision_agent.modules.evaluation.case_study import list_case_studies
+    return list_case_studies()
 
 
 def load_fixture(name: str) -> dict[str, Any]:
-    path = FIXTURES_DIR / f"{name}.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Benchmark fixture not found: {name}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Load a case study task definition (delegates to case_study module)."""
+    from decision_agent.modules.evaluation.case_study import load_case
+    return load_case(name)

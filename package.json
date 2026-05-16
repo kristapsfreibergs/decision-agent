@@ -10,7 +10,7 @@
     "start": "PYTHONPATH=backend/src python3 -m decision_agent.cli",
     "ui": "PYTHONPATH=backend/src python3 -m decision_agent.server",
     "run:example": "PYTHONPATH=backend/src python3 -m decision_agent.cli run examples/build-decision-agent.json",
-    "test": "PYTHONPATH=backend/src python3 -m unittest discover backend/tests"
+    "test": "PYTHONPATH=backend/src python3 -m unittest discover tests"
   },
   "engines": {
     "node": ">=20",

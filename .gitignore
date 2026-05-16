@@ -15,3 +15,5 @@ data/benchmarks/
 data/demo.db
 data/memory/
 archive/
+backend/tests/
+tests/
