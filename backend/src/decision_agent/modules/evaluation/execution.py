@@ -84,23 +84,24 @@ def _run_plain_model(
     fixture: dict[str, Any],
     root: Path,
     provider_override: str | None,
+    fixture_id: str = "",
 ) -> None:
+    from decision_agent.modules.evaluation.baseline_prompts import (
+        detect_domain_from_fixture,
+        get_a0_system_prompt,
+    )
+
     provider = get_provider(provider_override)
     audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
 
-    system = (
-        "You are an expert procurement advisor. "
-        "Given a procurement task, produce a vendor recommendation as a JSON object with these fields: "
-        "summary (string), eliminated_vendors (array of strings), "
-        "scored_vendors (array of objects with vendor and score), "
-        "shortlist (array of strings), evidence_sources (array of objects with id, type, excerpt, created_at). "
-        "Output only the JSON object, nothing else."
-    )
+    domain = detect_domain_from_fixture(fixture_id)
+    system = get_a0_system_prompt(domain)
     user = (
         f"Task: {fixture.get('title', '')}\n\n"
         f"{fixture.get('description', '')}"
     )
-    append_audit_event(audit_path, {"event": "worker_started", "run_id": run_id, "worker_id": "recommender"})
+    append_audit_event(audit_path, {"event": "run_started", "run_id": run_id, "condition": "A0"})
+    append_audit_event(audit_path, {"event": "llm_call_submitted", "run_id": run_id, "domain": domain})
     try:
         raw = provider.complete(system, user)
         import re as _re
@@ -108,17 +109,68 @@ def _run_plain_model(
         stripped = _re.sub(r"\s*```\s*$", "", stripped.strip())
         output = json.loads(stripped)
     except Exception as exc:
-        append_audit_event(audit_path, {"event": "worker_failed", "run_id": run_id, "worker_id": "recommender", "error": str(exc)[:300]})
+        append_audit_event(audit_path, {"event": "llm_call_failed", "run_id": run_id, "error": str(exc)[:300]})
         return
+
+    append_audit_event(audit_path, {"event": "llm_call_returned", "run_id": run_id})
 
     out_dir = root / "data" / "runs" / run_id / "outputs"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "recommender.json").write_text(
         json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    append_audit_event(audit_path, {"event": "validation_passed", "run_id": run_id, "worker_id": "recommender"})
-    append_audit_event(audit_path, {"event": "worker_submitted", "run_id": run_id, "worker_id": "recommender"})
-    append_audit_event(audit_path, {"event": "gate_approved", "run_id": run_id, "note": "plain_model_auto"})
+    append_audit_event(audit_path, {"event": "run_completed", "run_id": run_id, "condition": "A0"})
+
+
+def _run_informed_plain_model(
+    run_id: str,
+    fixture: dict[str, Any],
+    root: Path,
+    provider_override: str | None,
+    fixture_id: str = "",
+) -> None:
+    """A0-inf: single LLM call with the full context governed workers would receive.
+
+    Same as A0 but the user prompt includes all worker goals, evidence taxonomy,
+    DSC scope rules, and knowledge files. This isolates architectural enforcement
+    from information availability.
+    """
+    from decision_agent.modules.evaluation.baseline_prompts import (
+        build_informed_context,
+        detect_domain_from_fixture,
+        get_a0_system_prompt,
+    )
+
+    provider = get_provider(provider_override)
+    audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
+
+    domain = detect_domain_from_fixture(fixture_id)
+    system = get_a0_system_prompt(domain)
+    informed_context = build_informed_context(domain, root)
+    user = (
+        f"Task: {fixture.get('title', '')}\n\n"
+        f"{fixture.get('description', '')}\n\n"
+        f"{informed_context}"
+    )
+    append_audit_event(audit_path, {"event": "run_started", "run_id": run_id, "condition": "A0_inf"})
+    append_audit_event(audit_path, {"event": "llm_call_submitted", "run_id": run_id, "domain": domain})
+    try:
+        raw = provider.complete(system, user)
+        stripped = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
+        stripped = re.sub(r"\s*```\s*$", "", stripped.strip())
+        output = json.loads(stripped)
+    except Exception as exc:
+        append_audit_event(audit_path, {"event": "llm_call_failed", "run_id": run_id, "error": str(exc)[:300]})
+        return
+
+    append_audit_event(audit_path, {"event": "llm_call_returned", "run_id": run_id})
+
+    out_dir = root / "data" / "runs" / run_id / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "recommender.json").write_text(
+        json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    append_audit_event(audit_path, {"event": "run_completed", "run_id": run_id, "condition": "A0_inf"})
 
 
 def _apply_evidence_overrides(run_id: str, root: Path, overrides: dict[str, Any]) -> None:

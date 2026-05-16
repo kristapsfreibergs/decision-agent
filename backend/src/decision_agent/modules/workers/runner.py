@@ -66,21 +66,24 @@ def run_worker(
         emit(VALIDATION_FAILED, reason="; ".join(issues))
         raise ValueError(f"Worker {worker_id} output failed schema validation: {'; '.join(issues)}")
 
-    contract_issues = validate_contractual_output(output, contract, project_root=project_root)
     cfg = LayerConfig.from_dict(contract.get("layer_config"))
-    if cfg.paap_enabled and "evidence_sources_declared" in (contract.get("validators") or []):
-        _, record = evaluate_paap(output, contract, project_root=None)
-        if record.sources:
-            emit(
-                EVIDENCE_SCORED,
-                source_count=len(record.sources),
-                record_score=round(record.score, 4),
-                threshold=record.profile_thresholds.get("min_avg_score"),
-                passed=record.score >= record.profile_thresholds.get("min_avg_score", 0.0),
-            )
-    if contract_issues:
-        emit(VALIDATION_FAILED, reason="; ".join(contract_issues))
-        raise ValueError(f"Worker {worker_id} failed contractual validation: {'; '.join(contract_issues)}")
+    if cfg.contract_validators_enabled:
+        contract_issues = validate_contractual_output(output, contract, project_root=project_root)
+        if cfg.paap_enabled and "evidence_sources_declared" in (contract.get("validators") or []):
+            _, record = evaluate_paap(output, contract, project_root=None)
+            if record.sources:
+                emit(
+                    EVIDENCE_SCORED,
+                    source_count=len(record.sources),
+                    record_score=round(record.score, 4),
+                    threshold=record.profile_thresholds.get("min_avg_score"),
+                    passed=record.score >= record.profile_thresholds.get("min_avg_score", 0.0),
+                )
+        if contract_issues:
+            emit(VALIDATION_FAILED, reason="; ".join(contract_issues))
+            raise ValueError(f"Worker {worker_id} failed contractual validation: {'; '.join(contract_issues)}")
+    else:
+        contract_issues = []
 
     output_file = _write_worker_output(project_root, run_id, worker_id, output)
     _clear_checkpoint(project_root, run_id, worker_id)

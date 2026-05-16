@@ -6,7 +6,7 @@ from typing import Any
 
 from decision_agent.modules.evaluation.auto_approver import watch_run_to_completion
 from decision_agent.modules.evaluation.conditions import CONDITION_MAP, load_fixture
-from decision_agent.modules.evaluation.execution import _apply_evidence_overrides, _execute_workers_in_thread, _run_plain_model
+from decision_agent.modules.evaluation.execution import _apply_evidence_overrides, _execute_workers_in_thread, _run_informed_plain_model, _run_plain_model
 from decision_agent.modules.evaluation.metrics import extract_all_metrics
 from decision_agent.modules.runs.service import approve_architecture, build_architecture_proposal, create_run, generate_contracts_for_approved_architecture, start_run
 from decision_agent.shared.providers.registry import get_provider
@@ -34,7 +34,12 @@ def run_one(
     audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
 
     if condition == "A0":
-        _run_plain_model(run_id, fixture, root, provider_override)
+        _run_plain_model(run_id, fixture, root, provider_override, fixture_id=fixture_id)
+        run_dir = root / "data" / "runs" / run_id
+        return extract_all_metrics(run_dir, condition, rep, fixture_id)
+
+    if condition == "A0_inf":
+        _run_informed_plain_model(run_id, fixture, root, provider_override, fixture_id=fixture_id)
         run_dir = root / "data" / "runs" / run_id
         return extract_all_metrics(run_dir, condition, rep, fixture_id)
 

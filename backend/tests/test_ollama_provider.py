@@ -157,13 +157,13 @@ class TestBenchmarkProvidersEnvFilter(unittest.TestCase):
         os.environ.pop("BENCHMARK_PROVIDERS", None)
         from decision_agent.modules.evaluation.runner import _active_conditions
         keys = set(_active_conditions().keys())
-        self.assertEqual(keys, {"A0", "A", "C", "F", "G_qwen", "G_llama"})
+        self.assertEqual(keys, {"A0", "A0_inf", "A", "C", "F", "G_qwen", "G_llama"})
 
     def test_anthropic_only_drops_ollama_conditions(self) -> None:
         os.environ["BENCHMARK_PROVIDERS"] = "anthropic"
         from decision_agent.modules.evaluation.runner import _active_conditions
         keys = set(_active_conditions().keys())
-        self.assertEqual(keys, {"A0", "A", "C", "F"})
+        self.assertEqual(keys, {"A0", "A0_inf", "A", "C", "F"})
 
     def test_qwen_only_drops_anthropic_and_llama(self) -> None:
         os.environ["BENCHMARK_PROVIDERS"] = "ollama/qwen2.5"
@@ -175,7 +175,7 @@ class TestBenchmarkProvidersEnvFilter(unittest.TestCase):
         os.environ["BENCHMARK_PROVIDERS"] = "anthropic, ollama/qwen2.5"
         from decision_agent.modules.evaluation.runner import _active_conditions
         keys = set(_active_conditions().keys())
-        self.assertEqual(keys, {"A0", "A", "C", "F", "G_qwen"})
+        self.assertEqual(keys, {"A0", "A0_inf", "A", "C", "F", "G_qwen"})
 
     def test_unknown_provider_keeps_only_baseline_a(self) -> None:
         # A's provider is None (uses default), so it's always kept. Filtering
