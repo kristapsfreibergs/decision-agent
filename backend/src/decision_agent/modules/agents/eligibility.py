@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from decision_agent.modules.agents.base import AgentBase
-from decision_agent.modules.operators.det_check import CheckOperator
 from decision_agent.modules.operators.det_filter import FilterOperator
 from decision_agent.modules.operators.det_log import LogOperator
 from decision_agent.modules.operators.det_update_state import UpdateStateOperator
@@ -15,7 +14,6 @@ class EligibilityAgent(AgentBase):
         super().__init__(
             agent_id="eligibility",
             operators=[
-                CheckOperator(),
                 FilterOperator(),
                 UpdateStateOperator(),
                 LogOperator(),
@@ -24,25 +22,27 @@ class EligibilityAgent(AgentBase):
         )
 
     def _operator_config(self, op_name: str, state: DecisionState) -> dict[str, Any]:
-        if op_name == "check":
-            return {"output": state.evidence, "contract": {}}
         if op_name == "filter":
             candidates = state.evidence.get("active_vendors", [])
             if isinstance(candidates, list) and candidates and isinstance(candidates[0], str):
                 candidates = [{"name": v} for v in candidates]
-            hard_constraints = self._build_constraints(state)
+            hard_constraints = self._load_hard_constraints(state)
             return {"candidates": candidates, "hard_constraints": hard_constraints}
         if op_name == "update_state":
-            return {"patch": {"eligible_options": state.eligible_options}}
+            return {"patch": {}}
         if op_name == "log":
             return {"event": "agent_completed", "extra": {"agent_id": self.agent_id}}
         return {}
 
-    def _build_constraints(self, state: DecisionState) -> list[dict[str, Any]]:
-        constraints: list[dict[str, Any]] = []
-        compliance = state.requirements.get("compliance_requirements", [])
-        if compliance:
-            for req in compliance:
-                if isinstance(req, str):
-                    constraints.append({"field": req, "op": "truthy", "value": True})
-        return constraints
+    def _load_hard_constraints(self, state: DecisionState) -> list[dict[str, Any]]:
+        for key in ("hard_constraints", "constraints"):
+            raw = state.requirements.get(key)
+            if isinstance(raw, list):
+                valid = [c for c in raw if isinstance(c, dict) and c.get("field")]
+                if valid:
+                    return valid
+        result: list[dict[str, Any]] = []
+        for req in state.requirements.get("compliance_requirements", []):
+            if isinstance(req, str):
+                result.append({"field": req, "op": "truthy", "value": True})
+        return result

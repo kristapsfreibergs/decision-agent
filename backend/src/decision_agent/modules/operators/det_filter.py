@@ -28,6 +28,12 @@ class FilterOperator(OperatorBase):
                     failed.append(f"{field}: expected {expected}, got {actual}")
                 elif op == "gte" and (actual is None or actual < expected):
                     failed.append(f"{field}: expected >= {expected}, got {actual}")
+                elif op == "lte" and (actual is None or actual > expected):
+                    failed.append(f"{field}: expected <= {expected}, got {actual}")
+                elif op == "date_gte" and (actual is None or str(actual) < str(expected)):
+                    failed.append(f"{field}: expected >= {expected}, got {actual}")
+                elif op == "date_lte" and (actual is None or str(actual) > str(expected)):
+                    failed.append(f"{field}: expected <= {expected}, got {actual}")
                 elif op == "in" and actual not in expected:
                     failed.append(f"{field}: expected in {expected}, got {actual}")
                 elif op == "contains" and expected not in (actual or ""):

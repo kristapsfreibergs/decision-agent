@@ -7,7 +7,7 @@ VALID_TRANSITIONS: dict[DecisionPhase, list[DecisionPhase]] = {
     DecisionPhase.EVIDENCE_INCOMPLETE: [DecisionPhase.ELIGIBLE],
     DecisionPhase.ELIGIBLE: [DecisionPhase.EVALUATED],
     DecisionPhase.EVALUATED: [DecisionPhase.RECOMMENDED],
-    DecisionPhase.RECOMMENDED: [DecisionPhase.APPROVED],
+    DecisionPhase.RECOMMENDED: [DecisionPhase.APPROVED, DecisionPhase.STATE_UPDATED],
     DecisionPhase.APPROVED: [DecisionPhase.STATE_UPDATED],
     DecisionPhase.STATE_UPDATED: [DecisionPhase.VALIDATED],
     DecisionPhase.VALIDATED: [],

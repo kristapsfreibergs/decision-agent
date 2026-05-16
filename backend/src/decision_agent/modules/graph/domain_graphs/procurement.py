@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from decision_agent.modules.agents.comparison import ComparisonAgent
+from decision_agent.modules.agents.advocate import AdvocateAgent
+from decision_agent.modules.agents.challenger import ChallengerAgent
 from decision_agent.modules.agents.eligibility import EligibilityAgent
-from decision_agent.modules.agents.evaluation import EvaluationAgent
 from decision_agent.modules.agents.evidence import EvidenceAgent
-from decision_agent.modules.agents.normalization import NormalizationAgent
 from decision_agent.modules.agents.recommendation import RecommendationAgent
 from decision_agent.modules.agents.requirement import RequirementAgent
-from decision_agent.modules.agents.state_update import StateUpdateAgent
-from decision_agent.modules.agents.state_validation import StateValidationAgent
 from decision_agent.modules.graph.definition import DecisionGraph
 from decision_agent.modules.state.decision_state import DecisionPhase, DecisionState
 
@@ -23,24 +20,18 @@ def build_procurement_graph(
     agents = {
         "requirement": RequirementAgent(),
         "evidence": EvidenceAgent(),
-        "normalization": NormalizationAgent(),
         "eligibility": EligibilityAgent(),
-        "evaluation": EvaluationAgent(),
-        "comparison": ComparisonAgent(),
+        "advocate": AdvocateAgent(),
+        "challenger": ChallengerAgent(),
         "recommendation": RecommendationAgent(),
-        "state_update": StateUpdateAgent(),
-        "state_validation": StateValidationAgent(),
     }
 
     edges = [
         ("requirement", "evidence"),
-        ("evidence", "normalization"),
-        ("normalization", "eligibility"),
-        ("eligibility", "evaluation"),
-        ("evaluation", "comparison"),
-        ("comparison", "recommendation"),
-        ("recommendation", "state_update"),
-        ("state_update", "state_validation"),
+        ("evidence", "eligibility"),
+        ("eligibility", "advocate"),
+        ("advocate", "challenger"),
+        ("challenger", "recommendation"),
     ]
 
     initial_requirements = {}

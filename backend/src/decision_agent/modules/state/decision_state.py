@@ -25,6 +25,7 @@ class DecisionState:
     requirements: dict[str, Any] = field(default_factory=dict)
     evidence: dict[str, Any] = field(default_factory=dict)
     normalized_data: dict[str, Any] = field(default_factory=dict)
+    enriched_candidates: list[dict[str, Any]] = field(default_factory=list)
     eligible_options: list[dict[str, Any]] = field(default_factory=list)
     scores: list[dict[str, Any]] = field(default_factory=list)
     rankings: list[dict[str, Any]] = field(default_factory=list)
