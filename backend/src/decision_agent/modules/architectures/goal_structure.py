@@ -4,6 +4,8 @@ import json
 import re
 from typing import Any
 
+from decision_agent.shared.providers.base import GOAL_CLASSIFICATION_MAX_TOKENS
+
 SHAPES = {"pipeline", "tree", "search", "funnel", "debate", "checker"}
 
 HIGH_RISK_KEYWORDS = {"auth", "security", "payment", "invoice", "medical", "legal", "production", "prescription"}
@@ -69,7 +71,7 @@ def classify_goal_structure(task: dict[str, Any], provider: Any = None) -> dict[
 def _llm_classify(task: dict[str, Any], provider: Any) -> dict[str, Any] | None:
     user = f"Task: {task.get('title', '')}\nDescription: {task.get('description', '') or 'none'}"
     try:
-        raw = provider.complete(_SYSTEM, user, max_tokens=256)
+        raw = provider.complete(_SYSTEM, user, max_tokens=GOAL_CLASSIFICATION_MAX_TOKENS)
         raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
         raw = re.sub(r"\s*```$", "", raw.strip())
         data = json.loads(raw)

@@ -6,7 +6,7 @@ from typing import Any
 
 from decision_agent.modules.architectures.domains import procurement as _procurement_domain
 from decision_agent.modules.architectures.domains import story as _story_domain
-from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.base import DOMAIN_DETECTION_MAX_TOKENS, LLMProvider
 
 _DOMAIN_CATALOG: dict[str, tuple[dict, Any, tuple[str, ...]]] = {
     _story_domain.DOMAIN_ID: (
@@ -46,7 +46,7 @@ def _detect_domain(task: dict[str, Any], provider: LLMProvider | None) -> str | 
         return None
     user = f"Task: {task.get('title', '')}\nDescription: {task.get('description', '') or 'none'}"
     try:
-        raw = provider.complete(_build_detect_prompt(), user, max_tokens=64)
+        raw = provider.complete(_build_detect_prompt(), user, max_tokens=DOMAIN_DETECTION_MAX_TOKENS)
         raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
         raw = re.sub(r"\s*```$", "", raw.strip())
         data = json.loads(raw)

@@ -5,7 +5,7 @@ from typing import Any
 
 from decision_agent.modules.architectures.proposal import artifact_to_proposal, build_planning_artifact
 from decision_agent.modules.architectures.goal_structure import classify_goal_structure
-from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.base import CLARIFICATION_MAX_TOKENS, LLMProvider
 
 
 def suggest_task_setup(task: dict[str, Any], root: Path, provider: LLMProvider | None = None) -> dict[str, Any]:
@@ -119,7 +119,7 @@ def _generate_clarification_questions(
 
     import json, re
     try:
-        raw = provider.complete(system, user, max_tokens=512)
+        raw = provider.complete(system, user, max_tokens=CLARIFICATION_MAX_TOKENS)
         raw = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
         raw = re.sub(r"\s*```$", "", raw.strip())
         questions = json.loads(raw)
