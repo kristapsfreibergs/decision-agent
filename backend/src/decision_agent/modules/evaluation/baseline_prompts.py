@@ -18,10 +18,13 @@ from typing import Any
 A0_SYSTEM_PROMPTS: dict[str, str] = {
     "procurement": (
         "You are an expert procurement advisor. "
-        "Given a procurement task, produce a vendor recommendation as a JSON object with these fields: "
-        "summary (string), eliminated_vendors (array of strings), "
-        "scored_vendors (array of objects with vendor and score), "
-        "shortlist (array of strings), evidence_sources (array of objects with id, type, excerpt, created_at). "
+        "Evaluate ALL vendors listed in the knowledge files. "
+        "Be extremely concise. Target under 800 output tokens total. One short phrase per vendor in eliminated_vendors, one integer score per dimension in scored_vendors. "
+        "Produce a vendor recommendation as a JSON object with these fields: "
+        "summary (2 sentences max), eliminated_vendors (array of strings), "
+        "scored_vendors (array of {vendor, price_score, delivery_score, quality_score, compliance_score}), "
+        "shortlist (array of vendor name strings only), recommended_vendor (string, vendor name only), "
+        "evidence_sources (array of {id, type, excerpt} — excerpt max 20 words each). "
         "Output only the JSON object, nothing else."
     ),
     "cv_evaluation": (
@@ -89,7 +92,7 @@ def get_domain_output_spec(domain: str) -> list[str]:
     return DOMAIN_OUTPUT_SPECS.get(domain, DOMAIN_OUTPUT_SPECS[_DEFAULT_DOMAIN])
 
 
-_MAX_FILE_CHARS = 4_000
+_MAX_FILE_CHARS = 40_000
 
 
 def build_informed_context(domain: str, project_root: Path) -> str:
@@ -98,7 +101,7 @@ def build_informed_context(domain: str, project_root: Path) -> str:
     Includes: all worker goals and output schemas from the domain catalog,
     evidence taxonomy with authority weights, DSC scope rules, and knowledge
     files the workers would read. This is concatenated into a single context
-    block so A0-inf receives identical information to F — without any
+    block so A0 receives identical information to F -- without any
     architectural enforcement.
     """
     parts: list[str] = []
@@ -149,12 +152,20 @@ def build_informed_context(domain: str, project_root: Path) -> str:
         if phrases:
             parts.append(f"Forbidden phrases: {', '.join(phrases)}")
 
-    # Knowledge files
-    knowledge_dir = project_root / "archive" / "knowledge" / domain
-    if knowledge_dir.exists():
+    # Knowledge files — read directly from case study input/ directory
+    from decision_agent.modules.evaluation.case_study import case_studies_dir, knowledge_dir as _kd
+    # project_root is the run dir; derive case_id from it (input/ is at case study root)
+    # Fall back: scan input/ from case studies root matching domain prefix
+    input_dir = None
+    cs_root = case_studies_dir()
+    for case_dir in sorted(cs_root.iterdir()):
+        if case_dir.is_dir() and case_dir.name.startswith(domain):
+            input_dir = case_dir / "input"
+            break
+    if input_dir and input_dir.exists():
         parts.append("\n=== KNOWLEDGE FILES ===")
-        for fpath in sorted(knowledge_dir.rglob("*.md")):
-            rel = fpath.relative_to(project_root)
+        for fpath in sorted(input_dir.rglob("*.md")):
+            rel = fpath.relative_to(input_dir)
             try:
                 content = fpath.read_text(encoding="utf-8")[:_MAX_FILE_CHARS]
             except OSError:

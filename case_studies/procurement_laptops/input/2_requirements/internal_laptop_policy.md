@@ -7,7 +7,7 @@ Requesting 100 developer laptops for the new Riga EU office, opening Q3 2026. Ou
 ### Hardware Specifications
 
 **Processing**
-- CPU: minimum 8 physical cores. 12+ cores strongly preferred — our CI build times on 8-core machines are unacceptable (45min+ for full test suite). Current Berlin team uses 12-core ThinkPads and reports 22min builds.
+- CPU: minimum 8 physical cores. 12+ cores strongly preferred — our CI build times on 8-core machines are unacceptable (45min+ for full test suite). Current Berlin team uses 12-core AtlasBook systems and reports 22min builds.
 - Architecture: x86_64 required. ARM64 is not acceptable — our toolchain (CUDA dev kit, several proprietary EDA tools) has no ARM Linux builds.
 
 **Memory and Storage**
@@ -31,7 +31,7 @@ Requesting 100 developer laptops for the new Riga EU office, opening Q3 2026. Ou
 
 **Battery and Thermal**
 - Battery life: minimum 8 hours under normal development workload (IDE + browser + Docker idle). 10+ hours preferred.
-- Thermal: must sustain full CPU load for 30+ minutes without throttling below base clock. Open-plan office — fan noise must remain below 45 dB under sustained load. Previous HP EliteBook batch (2024) was returned due to fan noise complaints.
+- Thermal: must sustain full CPU load for 30+ minutes without throttling below base clock. Open-plan office — fan noise must remain below 45 dB under sustained load. Previous CinderBook batch (2024) was returned due to fan noise complaints.
 - Weight: under 1.9 kg preferred. Under 2.1 kg maximum. Developers travel between Riga and Berlin offices monthly.
 
 **Keyboard and Build**
@@ -40,9 +40,9 @@ Requesting 100 developer laptops for the new Riga EU office, opening Q3 2026. Ou
 - Spill-resistant keyboard.
 
 ### Operating System
-- Ubuntu 24.04 LTS must be the primary OS. We do NOT use Windows.
-- Linux certification or verified community compatibility is a hard requirement. "Runs Linux" is not sufficient — we need confirmed driver support for: Wi-Fi, Bluetooth, suspend/resume, external displays via USB-C and HDMI, fingerprint reader (if present).
-- Vendor must permit self-imaging. BIOS/firmware must not be locked to a specific OS. Secure Boot must be configurable (disable/custom keys for internal kernel signing).
+- Ubuntu 24.04 LTS is our preferred OS. We do NOT use Windows.
+- Linux compatibility is strongly preferred. Confirmed driver support for Wi-Fi, Bluetooth, suspend/resume, and external displays is desirable.
+- Vendor must permit self-imaging. BIOS/firmware must not be locked to a specific OS. Secure Boot must be configurable.
 - TPM 2.0 required for LUKS full-disk encryption.
 
 ---
@@ -88,4 +88,4 @@ Delivery timeline is critical. The Riga office opens 2026-09-01. Laptops must be
 - Contract signature target: **2026-06-01**
 - That gives the vendor approximately **8 weeks** from contract to delivery
 
-Also: we need compatible docking stations (USB-C/Thunderbolt). If the laptop vendor offers a certified dock, quote it separately. If not, confirm compatibility with Lenovo ThinkPad USB-C Dock Gen 2 (our Berlin office standard).
+Also: we need compatible docking stations (USB-C/Thunderbolt). If the laptop vendor offers a certified dock, quote it separately. If not, confirm compatibility with Atlas USB-C Dock Standard (our Berlin office standard).

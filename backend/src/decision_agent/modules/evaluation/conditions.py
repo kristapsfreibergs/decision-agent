@@ -7,7 +7,6 @@ from decision_agent.modules.governance.layer_config import LayerConfig
 
 _FULL_CONDITION_MAP: dict[str, tuple[LayerConfig, str | None]] = {
     "A0":      (LayerConfig.baseline(), "anthropic"),
-    "A0_inf":  (LayerConfig.baseline(), "anthropic"),
     "A":       (LayerConfig.baseline(), None),
     "C":       (LayerConfig(dsc_enabled=False, paap_enabled=False, dar_enabled=False,
                             human_gate_enabled=False, contract_validators_enabled=True), "anthropic"),

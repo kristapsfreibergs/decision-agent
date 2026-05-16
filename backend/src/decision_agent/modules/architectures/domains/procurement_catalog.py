@@ -14,9 +14,9 @@ WORKER_CATALOG: list[dict[str, Any]] = [
             "quality standards, delivery timeline, budget ceiling, and any mandatory "
             "compliance requirements (legal, regulatory, or organisational policy). "
             "Flag any gaps that would block evaluation. "
-            "Read archive/knowledge/procurement/requirements/ for templates and past specs."
+            "Read archive/knowledge/procurement/2_requirements/ for templates and past specs."
         ),
-        "read_paths": ["archive/knowledge/procurement/requirements/**"],
+        "read_paths": ["archive/knowledge/procurement/2_requirements/**"],
         "write_paths": ["data/runs/{run_id}/workspace/requirements.md"],
         "allowed_tools": ["read_file", "write_file", "list_files"],
         "validators": ["write_scope"],
@@ -46,10 +46,10 @@ WORKER_CATALOG: list[dict[str, Any]] = [
             "Find: who the active vendors are, typical market pricing and lead times, "
             "any supply constraints or monopoly risks, and recent procurement outcomes "
             "for similar items. Use web search if available, fall back to "
-            "archive/knowledge/procurement/markets/ otherwise. "
+            "archive/knowledge/procurement/3_offers/ otherwise. "
             "Do not infer vendor capabilities — only report what can be sourced."
         ),
-        "read_paths": ["archive/knowledge/procurement/markets/**"],
+        "read_paths": ["archive/knowledge/procurement/3_offers/**"],
         "write_paths": ["data/runs/{run_id}/workspace/market_research.md"],
         "allowed_tools": ["read_file", "write_file", "list_files", "web_search", "query_sql"],
         "validators": ["write_scope"],
@@ -74,9 +74,9 @@ WORKER_CATALOG: list[dict[str, Any]] = [
             "compliance risk (regulatory exposure if requirements are not met), "
             "budget risk (market prices vs ceiling), and reputational risk. "
             "Rate each risk LOW / MEDIUM / HIGH with a one-line justification. "
-            "Read archive/knowledge/procurement/risk-register/ for past risk decisions."
+            "Read archive/knowledge/procurement/4_context/ for past risk decisions."
         ),
-        "read_paths": ["archive/knowledge/procurement/risk-register/**"],
+        "read_paths": ["archive/knowledge/procurement/4_context/**"],
         "write_paths": ["data/runs/{run_id}/workspace/risk_assessment.md"],
         "allowed_tools": ["read_file", "write_file", "list_files"],
         "validators": ["write_scope"],
@@ -118,7 +118,7 @@ WORKER_CATALOG: list[dict[str, Any]] = [
             "data/runs/{run_id}/workspace/requirements.md",
             "data/runs/{run_id}/workspace/market_research.md",
             "data/runs/{run_id}/workspace/risk_assessment.md",
-            "archive/knowledge/procurement/evaluation-criteria/**",
+            "archive/knowledge/procurement/2_requirements/**",
         ],
         "write_paths": ["data/runs/{run_id}/workspace/evaluation.md"],
         "allowed_tools": ["read_file", "write_file", "list_files", "query_sql", "memory_search"],

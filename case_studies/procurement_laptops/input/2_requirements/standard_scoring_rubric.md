@@ -40,3 +40,5 @@ A vendor is eliminated (not scored) if ANY of these apply:
 - Cannot ship from EU warehouse
 - Cannot meet 32 GB RAM / 1 TB SSD minimum
 - No 3-year on-site warranty available
+
+**Note:** The price ceiling above (EUR 2,000/unit) reflects the original IT request. Refer to the Finance Department Budget Approval in the Requirements Package for the authorised figure, which supersedes this rubric where they differ.

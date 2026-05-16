@@ -7,7 +7,7 @@ from decision_agent.modules.evaluation.governance_metrics import audit_completen
 from decision_agent.modules.evaluation.ground_truth_metrics import evaluate_ground_truth
 from decision_agent.modules.evaluation.metric_loaders import _load_run_record
 from decision_agent.modules.evaluation.quality_metrics import evidence_types_unrecognized, output_quality, recommendation_traceable, run_completed
-from decision_agent.modules.evaluation.runtime_metrics import cost_tokens_total, model_provider, time_to_complete, worker_latency_p50_ms
+from decision_agent.modules.evaluation.runtime_metrics import cost_tokens_total, estimated_cost_usd, model_name, model_provider, time_to_complete, tokens_input, tokens_output, worker_latency_p50_ms
 
 def extract_all_metrics(
     run_dir: Path,
@@ -23,6 +23,7 @@ def extract_all_metrics(
         "rep": rep,
         "run_id": record.get("run_id"),
         "provider": model_provider(run_dir),
+        "model_name": model_name(run_dir),
         "scope_violations": scope_violations(run_dir),
         "evidence_types_unrecognized": evidence_types_unrecognized(run_dir),
         "recommendation_traceable": recommendation_traceable(run_dir),
@@ -35,6 +36,9 @@ def extract_all_metrics(
         "time_to_complete_s": time_to_complete(run_dir),
         "run_completed": run_completed(run_dir),
         "cost_tokens_total": cost_tokens_total(run_dir),
+        "tokens_input": tokens_input(run_dir),
+        "tokens_output": tokens_output(run_dir),
+        "estimated_cost_usd": estimated_cost_usd(run_dir),
         "worker_latency_p50_ms": worker_latency_p50_ms(run_dir),
     }
     if ground_truth:

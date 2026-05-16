@@ -15,6 +15,8 @@ from decision_agent.modules.evaluation.quality_metrics import (
 )
 from decision_agent.modules.evaluation.runtime_metrics import (
     cost_tokens_total,
+    estimated_cost_usd,
+    model_name,
     model_provider,
     time_to_complete,
     worker_latency_p50_ms,
@@ -24,6 +26,8 @@ __all__ = [
     "audit_completeness",
     "authorization_receipt_present",
     "cost_tokens_total",
+    "estimated_cost_usd",
+    "model_name",
     "evidence_completeness",
     "evidence_types_unrecognized",
     "extract_all_metrics",

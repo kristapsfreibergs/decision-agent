@@ -1,0 +1,106 @@
+{
+  "currency": "EUR",
+  "contract_signature_target": "2026-06-01",
+  "required_delivery_date": "2026-07-25",
+  "hard_constraints": [
+    {
+      "id": "unit_price_finance_ceiling",
+      "field": "unit_price_eur",
+      "op": "lte",
+      "value": 1800,
+      "authority": "finance_department_budget_approval"
+    },
+    {
+      "id": "total_budget_finance_ceiling",
+      "field": "total_price_eur",
+      "op": "lte",
+      "value": 180000,
+      "authority": "finance_department_budget_approval"
+    },
+    {
+      "id": "iso_27001_current",
+      "field": "iso_27001_valid",
+      "op": "eq",
+      "value": true,
+      "authority": "ciso_directive"
+    },
+    {
+      "id": "iso_27001_valid_through_delivery_buffer",
+      "field": "iso_27001_valid_through",
+      "op": "date_gte",
+      "value": "2027-06-30",
+      "authority": "ciso_directive"
+    },
+    {
+      "id": "gdpr_dpa_available",
+      "field": "gdpr_dpa_status",
+      "op": "in",
+      "value": ["available", "legal_review_required"],
+      "authority": "ciso_directive"
+    },
+    {
+      "id": "gdpr_dpa_no_blocker",
+      "field": "gdpr_dpa_blocker",
+      "op": "eq",
+      "value": false,
+      "authority": "ciso_directive"
+    },
+    {
+      "id": "eu_warehouse_shipping",
+      "field": "ships_from_eu_warehouse",
+      "op": "eq",
+      "value": true,
+      "authority": "ciso_directive"
+    },
+    {
+      "id": "ram_minimum",
+      "field": "ram_gb",
+      "op": "gte",
+      "value": 32,
+      "authority": "it_department_memo"
+    },
+    {
+      "id": "ssd_minimum",
+      "field": "ssd_tb",
+      "op": "gte",
+      "value": 1,
+      "authority": "it_department_memo"
+    },
+    {
+      "id": "onsite_warranty_minimum",
+      "field": "onsite_warranty_years",
+      "op": "gte",
+      "value": 3,
+      "authority": "case_task"
+    },
+    {
+      "id": "x86_64_architecture",
+      "field": "architecture",
+      "op": "eq",
+      "value": "x86_64",
+      "authority": "it_department_memo"
+    },
+    {
+      "id": "cpu_physical_performance_cores_minimum",
+      "field": "cpu_physical_performance_cores",
+      "op": "gte",
+      "value": 6,
+      "note": "Marketing thread counts include efficiency cores. Only physical performance cores (P-cores) count toward this threshold. U-series processors with 2P cores do not qualify.",
+      "authority": "it_department_memo"
+    },
+    {
+      "id": "quote_valid_at_signature",
+      "field": "quote_valid_until",
+      "op": "date_gte",
+      "value": "2026-06-01",
+      "authority": "operations_timeline"
+    },
+    {
+      "id": "delivery_within_deadline",
+      "field": "delivery_date_estimate",
+      "op": "date_lte",
+      "value": "2026-07-25",
+      "authority": "operations_timeline"
+    }
+  ]
+}

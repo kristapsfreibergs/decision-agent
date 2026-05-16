@@ -1,6 +1,6 @@
 {
   "conditions": [
-    "A0", "A0_inf", "A", "C", "F",
+    "A0", "A", "C", "F",
     "F_no_DSC", "F_no_PAAP", "F_no_DAR"
   ],
   "reps": 3,

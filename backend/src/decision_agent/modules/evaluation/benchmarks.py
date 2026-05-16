@@ -118,6 +118,7 @@ def run_benchmark_sync(
         for fixture in fixtures:
             for condition in conditions:
                 for rep in range(reps):
+                    print(f"[{state['completed_runs'] + 1}/{state['total_runs']}] {fixture} / {condition} / rep{rep} ...", flush=True)
                     try:
                         metrics = run_one(
                             fixture, condition, rep, root, timeout_seconds,
@@ -138,6 +139,10 @@ def run_benchmark_sync(
                             "rep": rep,
                             "error": str(exc)[:500],
                         }
+                        print(f"  ERROR: {str(exc)[:120]}", flush=True)
+                    else:
+                        status = metrics.get("run_completed", "?")
+                        print(f"  done — run_completed={status}", flush=True)
                     state["results"].append(metrics)
                     state["completed_runs"] += 1
                     _persist_progress(out_dir, state)

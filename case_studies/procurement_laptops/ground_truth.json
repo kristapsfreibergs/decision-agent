@@ -1,18 +1,44 @@
 {
+  "_meta": {
+    "visibility": "evaluation_only",
+    "note": "This answer key must never be included in model-facing prompts, worker context, knowledge archives, or run inputs. It is only for post-run metric extraction."
+  },
   "expected_outcome": "recommend_vendor",
-  "acceptable_vendors": ["Lenovo"],
+  "acceptable_vendors": ["Vendor Atlas", "Vendor Helio"],
   "expected_eliminations": [
-    {"vendor": "Apple", "reason": "budget"}
+    {"vendor": "Vendor Boreal", "reason": "cpu_physical_performance_cores_below_minimum"},
+    {"vendor": "Vendor Cinder", "reason": "over_budget_and_late_delivery"},
+    {"vendor": "Vendor Delta", "reason": "budget_and_no_iso_27001_and_wrong_architecture"},
+    {"vendor": "Vendor Ember", "reason": "expired_iso_27001"},
+    {"vendor": "Vendor Fennel", "reason": "non_eu_warehouse"},
+    {"vendor": "Vendor Granite", "reason": "ram_and_storage_below_minimum"},
+    {"vendor": "Vendor Ion", "reason": "quote_expired_before_signature"},
+    {"vendor": "Vendor Juniper", "reason": "gdpr_dpa_blocker"}
   ],
   "expected_risk_rating": "MEDIUM",
-  "expected_escalation": false,
+  "expected_escalation": null,
   "must_detect_constraints": [
     "budget_ceiling",
     "gdpr_compliance",
     "eu_warehouse",
     "iso_27001",
-    "3_year_onsite_warranty"
+    "3_year_onsite_warranty",
+    "cpu_physical_performance_cores"
   ],
   "required_evidence_types": ["compliance_rule", "vendor_proposal"],
-  "notes": "Lenovo wins on price and compliance. Apple eliminated on budget ceiling. Dell is acceptable reserve. Budget is tight but achievable with volume discount."
+  "traps": [
+    {
+      "id": "budget_contradiction",
+      "description": "Rubric and brief cite EUR 2,000/unit; Finance approval and hard_constraints.json set the real ceiling at EUR 1,800. Model must resolve in favour of the stricter authoritative source.",
+      "vendors_affected": ["Vendor Delta"],
+      "correct_action": "eliminate at EUR 1,800 ceiling, not EUR 2,000"
+    },
+    {
+      "id": "cpu_marketing_vs_physical_cores",
+      "description": "Vendor Boreal 7450 is marketed as 10-core/12-thread but has only 2 physical performance cores (U-series). Hard constraint requires 6+ P-cores. Model must distinguish marketing thread count from physical core count.",
+      "vendors_affected": ["Vendor Boreal"],
+      "correct_action": "eliminate on cpu_physical_performance_cores_minimum"
+    }
+  ],
+  "notes": "Vendor Atlas and Vendor Helio both pass all hard gates and are acceptable winners. Atlas is preferred due to Canonical Ubuntu 24.04 certification (a soft requirement from policy). Each of the other 8 vendors fails at least one mandatory hard constraint. Two embedded traps: budget contradiction (EUR 2,000 in rubric vs EUR 1,800 in hard_constraints.json — stricter wins) and CPU core marketing vs physical cores (Boreal 7450 marketed as 10-core but only 2 physical P-cores)."
 }

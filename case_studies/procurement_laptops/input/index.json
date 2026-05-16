@@ -1,0 +1,21 @@
+{
+  "read_paths": {
+    "requirement_analyst": [
+      "1_task/procurement_brief.md",
+      "2_requirements/internal_laptop_policy.md",
+      "2_requirements/hard_constraints.json"
+    ],
+    "market_scout": [
+      "3_offers/eu_laptop_vendors_2026.md",
+      "3_offers/vendor_facts.json"
+    ],
+    "risk_assessor": [
+      "4_context/hardware_procurement_risks.md"
+    ],
+    "evaluator": [
+      "2_requirements/standard_scoring_rubric.md",
+      "2_requirements/hard_constraints.json",
+      "3_offers/vendor_facts.json"
+    ]
+  }
+}

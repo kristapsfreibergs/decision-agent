@@ -79,62 +79,13 @@ def _execute_workers_in_thread(
             t.join()
 
 
-def _run_plain_model(
+def _run_baseline_model(
     run_id: str,
     fixture: dict[str, Any],
     root: Path,
     provider_override: str | None,
     fixture_id: str = "",
 ) -> None:
-    from decision_agent.modules.evaluation.baseline_prompts import (
-        detect_domain_from_fixture,
-        get_a0_system_prompt,
-    )
-
-    provider = get_provider(provider_override)
-    audit_path = root / "data" / "runs" / run_id / "audit.jsonl"
-
-    domain = detect_domain_from_fixture(fixture_id)
-    system = get_a0_system_prompt(domain)
-    user = (
-        f"Task: {fixture.get('title', '')}\n\n"
-        f"{fixture.get('description', '')}"
-    )
-    append_audit_event(audit_path, {"event": "run_started", "run_id": run_id, "condition": "A0"})
-    append_audit_event(audit_path, {"event": "llm_call_submitted", "run_id": run_id, "domain": domain})
-    try:
-        raw = provider.complete(system, user)
-        import re as _re
-        stripped = _re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=_re.IGNORECASE)
-        stripped = _re.sub(r"\s*```\s*$", "", stripped.strip())
-        output = json.loads(stripped)
-    except Exception as exc:
-        append_audit_event(audit_path, {"event": "llm_call_failed", "run_id": run_id, "error": str(exc)[:300]})
-        return
-
-    append_audit_event(audit_path, {"event": "llm_call_returned", "run_id": run_id})
-
-    out_dir = root / "data" / "runs" / run_id / "outputs"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "recommender.json").write_text(
-        json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
-    append_audit_event(audit_path, {"event": "run_completed", "run_id": run_id, "condition": "A0"})
-
-
-def _run_informed_plain_model(
-    run_id: str,
-    fixture: dict[str, Any],
-    root: Path,
-    provider_override: str | None,
-    fixture_id: str = "",
-) -> None:
-    """A0-inf: single LLM call with the full context governed workers would receive.
-
-    Same as A0 but the user prompt includes all worker goals, evidence taxonomy,
-    DSC scope rules, and knowledge files. This isolates architectural enforcement
-    from information availability.
-    """
     from decision_agent.modules.evaluation.baseline_prompts import (
         build_informed_context,
         detect_domain_from_fixture,
@@ -146,14 +97,14 @@ def _run_informed_plain_model(
 
     domain = detect_domain_from_fixture(fixture_id)
     system = get_a0_system_prompt(domain)
-    informed_context = build_informed_context(domain, root)
-    user = (
-        f"Task: {fixture.get('title', '')}\n\n"
-        f"{fixture.get('description', '')}\n\n"
-        f"{informed_context}"
+    user = f"Task: {fixture.get('title', '')}\n\n{fixture.get('description', '')}"
+    user = f"{user}\n\n{build_informed_context(domain, root)}"
+
+    append_audit_event(audit_path, {"event": "run_started", "run_id": run_id, "condition": "A0"})
+    append_audit_event(
+        audit_path,
+        {"event": "llm_call_submitted", "run_id": run_id, "domain": domain},
     )
-    append_audit_event(audit_path, {"event": "run_started", "run_id": run_id, "condition": "A0_inf"})
-    append_audit_event(audit_path, {"event": "llm_call_submitted", "run_id": run_id, "domain": domain})
     try:
         raw = provider.complete(system, user)
         stripped = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
@@ -170,7 +121,7 @@ def _run_informed_plain_model(
     (out_dir / "recommender.json").write_text(
         json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    append_audit_event(audit_path, {"event": "run_completed", "run_id": run_id, "condition": "A0_inf"})
+    append_audit_event(audit_path, {"event": "run_completed", "run_id": run_id, "condition": "A0"})
 
 
 def _execute_graph(
@@ -227,4 +178,3 @@ def _apply_evidence_overrides(run_id: str, root: Path, overrides: dict[str, Any]
             json.dumps(contract, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
-

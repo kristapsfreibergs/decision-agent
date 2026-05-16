@@ -18,6 +18,9 @@ METRIC_FIELDS = (
     "time_to_complete_s",
     "run_completed",
     "cost_tokens_total",
+    "tokens_input",
+    "tokens_output",
+    "estimated_cost_usd",
     "worker_latency_p50_ms",
 )
 
@@ -28,6 +31,7 @@ CSV_HEADER = (
     "rep",
     "run_id",
     "provider",
+    "model_name",
     *METRIC_FIELDS,
     "error",
 )
@@ -47,6 +51,7 @@ def write_csv(results: list[dict[str, Any]], target: Path) -> None:
                     row.get("rep", ""),
                     row.get("run_id", ""),
                     row.get("provider", ""),
+                    row.get("model_name", ""),
                     *(row.get(field, "") for field in METRIC_FIELDS),
                     row.get("error", ""),
                 ]
