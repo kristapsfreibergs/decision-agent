@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.base import DEFAULT_MAX_TOKENS, LLMProvider
 
 
 _SCHEMA_ANCHOR = "Schema you must match:"
@@ -56,7 +56,7 @@ class MockProvider(LLMProvider):
     def name(self) -> str:
         return "mock"
 
-    def complete(self, system: str, user: str, *, max_tokens: int = 4096) -> str:
+    def complete(self, system: str, user: str, *, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
         schema = _extract_schema(system)
         required = schema.get("required", ["summary", "files_changed"])
         properties = schema.get("properties", {})

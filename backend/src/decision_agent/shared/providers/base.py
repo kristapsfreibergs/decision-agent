@@ -3,12 +3,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+DEFAULT_MAX_TOKENS = 8192
+EXTENDED_MAX_TOKENS = 32000
+DEFAULT_TIMEOUT_SECONDS = 180
+DOMAIN_DETECTION_MAX_TOKENS = 64
+GOAL_CLASSIFICATION_MAX_TOKENS = 256
+CLARIFICATION_MAX_TOKENS = 512
+
 
 class LLMProvider(ABC):
     """Minimal interface all providers must implement."""
 
     @abstractmethod
-    def complete(self, system: str, user: str, *, max_tokens: int = 16000) -> str:
+    def complete(self, system: str, user: str, *, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
         """Return the assistant text response for a single turn."""
         ...
 
@@ -18,7 +25,7 @@ class LLMProvider(ABC):
         messages: list[dict],
         tools: list[dict],
         *,
-        max_tokens: int = 16000,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
         tool_choice: dict | None = None,
     ) -> dict:
         """

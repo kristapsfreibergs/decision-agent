@@ -7,7 +7,7 @@ import urllib.request
 from typing import Any
 from uuid import uuid4
 
-from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.base import DEFAULT_MAX_TOKENS, DEFAULT_TIMEOUT_SECONDS, LLMProvider
 from decision_agent.shared.providers.retry import with_retry
 from decision_agent.shared.providers.ollama_tools import _extract_json_envelopes, _to_ollama_messages, _to_ollama_tools
 
@@ -19,7 +19,7 @@ class OllamaProvider(LLMProvider):
         if not host_value.startswith("http"):
             host_value = f"http://{host_value}"
         self._host = host_value.rstrip("/")
-        self._timeout_seconds = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "180"))
+        self._timeout_seconds = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS)))
 
     @property
     def name(self) -> str:
@@ -45,7 +45,7 @@ class OllamaProvider(LLMProvider):
 
         return with_retry(_do_request)
 
-    def complete(self, system: str, user: str, *, max_tokens: int = 4096) -> str:
+    def complete(self, system: str, user: str, *, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
         payload = {
             "model": self._model,
             "stream": False,
@@ -64,7 +64,7 @@ class OllamaProvider(LLMProvider):
         messages: list[dict],
         tools: list[dict],
         *,
-        max_tokens: int = 4096,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
         tool_choice: dict | None = None,
     ) -> dict:
         if not tools:
@@ -138,4 +138,3 @@ class OllamaProvider(LLMProvider):
                 "output_tokens": data.get("eval_count", 0),
             },
         }
-

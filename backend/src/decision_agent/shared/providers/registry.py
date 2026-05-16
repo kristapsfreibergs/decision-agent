@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from decision_agent.settings import load_env_file
-from decision_agent.shared.providers.base import LLMProvider
+from decision_agent.shared.providers.base import DEFAULT_MAX_TOKENS, LLMProvider
+
+DEFAULT_PROVIDER_NAME = "anthropic"
 
 OLLAMA_MODEL_ALIASES = {
     "ollama/qwen2.5": "qwen2.5:7b-instruct",
@@ -99,7 +101,7 @@ class FallbackProvider(LLMProvider):
                 continue
         raise last_exc or RuntimeError("All providers failed")
 
-    def complete(self, system: str, user: str, *, max_tokens: int = 4096) -> str:
+    def complete(self, system: str, user: str, *, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
         return self._try_each("complete", system, user, max_tokens=max_tokens)
 
     def complete_with_tools(
@@ -108,7 +110,7 @@ class FallbackProvider(LLMProvider):
         messages: list[dict],
         tools: list[dict],
         *,
-        max_tokens: int = 4096,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
         tool_choice: dict | None = None,
     ) -> dict:
         return self._try_each(
@@ -126,6 +128,13 @@ def _build_single_provider(name: str) -> LLMProvider:
         from decision_agent.shared.providers.anthropic import AnthropicProvider
         return AnthropicProvider()
 
+    if name == "openai" or name.startswith("openai/") or name.startswith("openai:"):
+        from decision_agent.shared.providers.openai import OpenAIProvider
+        if name == "openai":
+            return OpenAIProvider()
+        sep = "/" if "/" in name else ":"
+        return OpenAIProvider(model=name.split(sep, 1)[1])
+
     if name == "ollama" or name.startswith("ollama/") or name.startswith("ollama:"):
         from decision_agent.shared.providers.ollama import OllamaProvider
         if name in OLLAMA_MODEL_ALIASES:
@@ -136,8 +145,11 @@ def _build_single_provider(name: str) -> LLMProvider:
         custom = name.split(sep, 1)[1]
         return OllamaProvider(model=custom)
 
-    from decision_agent.shared.providers.mock import MockProvider
-    return MockProvider()
+    if name == "mock":
+        from decision_agent.shared.providers.mock import MockProvider
+        return MockProvider()
+
+    raise ValueError(f"Unknown provider: {name}")
 
 
 def get_provider(override: str | None = None) -> LLMProvider:
@@ -147,15 +159,15 @@ def get_provider(override: str | None = None) -> LLMProvider:
     PROVIDER_FALLBACK is a comma-separated list of fallback provider names.
     Example:
         MODEL_PROVIDER=anthropic
-        PROVIDER_FALLBACK=ollama/qwen2.5,mock
+        PROVIDER_FALLBACK=openai,ollama/qwen2.5
 
-    If Anthropic fails after retries, the FallbackProvider tries Ollama, then Mock.
+    If Anthropic fails after retries, the FallbackProvider tries OpenAI, then Ollama.
     Circuit breaker tracks consecutive failures per provider name and short-circuits
     after PROVIDER_CIRCUIT_THRESHOLD (default 3) consecutive failures for
     PROVIDER_CIRCUIT_RESET_SECONDS (default 60s).
     """
     load_env_file(Path.cwd() / ".env")
-    primary_name = (override or os.environ.get("MODEL_PROVIDER", "mock")).lower().strip()
+    primary_name = (override or os.environ.get("MODEL_PROVIDER", DEFAULT_PROVIDER_NAME)).lower().strip()
     primary = _build_single_provider(primary_name)
 
     fallback_raw = os.environ.get("PROVIDER_FALLBACK", "").strip()
