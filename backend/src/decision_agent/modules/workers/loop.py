@@ -7,6 +7,7 @@ from typing import Any, Callable
 from decision_agent.modules.runs.state import VALIDATION_FAILED, WORKER_MESSAGE
 from decision_agent.modules.workers.checkpoints import _load_checkpoint, _save_checkpoint
 from decision_agent.modules.workers.context import _read_context_files
+from decision_agent.modules.workers.json_output import _extract_json
 from decision_agent.modules.workers.prompts import _build_system_prompt, _build_user_prompt
 from decision_agent.modules.workers.tools import TOOL_DEFINITIONS, execute_tool
 from decision_agent.shared.providers.base import LLMProvider
@@ -101,11 +102,16 @@ def _run_model_loop(
             raise ValueError(f"Worker {worker_id} returned final text before required tool use.")
         raw_response = str(response["content"])
         emit(WORKER_MESSAGE, role="agent", text=raw_response[:500])
-        if "{" not in raw_response and step < max_steps - 1:
-            json_nudge_count += 1
-            messages.append({"role": "assistant", "content": raw_response})
-            messages.append({"role": "user", "content": _json_nudge(json_nudge_count)})
-            continue
+        try:
+            _extract_json(raw_response)
+        except ValueError as exc:
+            if step < max_steps - 1:
+                json_nudge_count += 1
+                emit(VALIDATION_FAILED, reason=f"Provider returned invalid JSON: {str(exc)[:200]}")
+                messages.append({"role": "assistant", "content": raw_response})
+                messages.append({"role": "user", "content": _json_nudge(json_nudge_count)})
+                continue
+            break
         break
     if not raw_response:
         emit(VALIDATION_FAILED, reason=f"Worker exceeded max_steps={max_steps} before final JSON.")

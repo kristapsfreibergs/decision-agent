@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import fnmatch
+import os
 from pathlib import Path
 from typing import Any, Callable
 
+from decision_agent.modules.workers.agent_query_tool import _execute_ask_agent
 from decision_agent.modules.workers.memory_tool import _execute_memory_search
 from decision_agent.modules.workers.path_rules import _file_glob_pattern, _is_under_root, _within_read_paths, _within_write_paths
 from decision_agent.modules.workers.sql_tool import _execute_query_sql
@@ -52,7 +55,7 @@ def execute_tool(
         glob_pattern = _file_glob_pattern(pattern)
         root = project_root.resolve()
         matches = sorted(
-            path.resolve().relative_to(root).as_posix()
+            path.relative_to(project_root).as_posix()
             for path in project_root.glob(glob_pattern)
             if path.is_file() and _is_under_root(path, project_root)
         )
@@ -77,9 +80,13 @@ def execute_tool(
         return (
             "web_search is not available in this environment. "
             f"Query was: '{query}'. "
-            "Fall back to archive/knowledge/procurement/markets/ for vendor and pricing data. "
+            "Fall back to archive/knowledge/procurement/3_offers/ "
+            "(legacy: archive/knowledge/procurement/markets/) for vendor and pricing data. "
             "Call list_files to discover available files, then read_file to access them."
         )
+
+    if name == "ask_agent":
+        return _execute_ask_agent(params, contract, project_root, audit_emit)
 
     if name == "memory_search":
         return _execute_memory_search(params, contract, project_root, audit_emit)

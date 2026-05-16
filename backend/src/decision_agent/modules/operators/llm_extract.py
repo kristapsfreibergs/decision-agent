@@ -24,6 +24,12 @@ class ExtractOperator(OperatorBase):
                 "event": event, "run_id": context.run_id, "agent_id": context.agent_id, **extra,
             })
 
+        # Inject registry and run_id so ask_agent tool can resolve peers
+        contract = {
+            **contract,
+            "run_id": context.run_id,
+            "_agent_registry": context.policies.get("_agent_registry") or {},
+        }
         try:
             raw, inp_tok, out_tok, wall_start = _run_model_loop(
                 context.run_id, context.agent_id, contract,

@@ -73,6 +73,29 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "ask_agent",
+        "description": (
+            "Ask another agent a question about what it knows. "
+            "The target agent answers from its already-completed analysis. "
+            "Use this when you need information from a previous step that isn't in your workspace files. "
+            "Only agents that have already completed can be asked."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_id": {
+                    "type": "string",
+                    "description": "The agent to ask, e.g. 'evidence', 'requirement', 'eligibility'.",
+                },
+                "question": {
+                    "type": "string",
+                    "description": "The question to ask. Be specific about what data you need.",
+                },
+            },
+            "required": ["agent_id", "question"],
+        },
+    },
+    {
         "name": "query_sql",
         "description": (
             "Query a table declared in configs/data-sources/schema-map.json. "

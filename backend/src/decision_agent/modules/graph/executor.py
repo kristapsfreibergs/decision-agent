@@ -39,6 +39,10 @@ class GraphExecutor:
         rd = _resolve_run_dir(context)
         rd.mkdir(parents=True, exist_ok=True)
 
+        # Shared registry: agent_id -> {output, provider} for ask_agent tool
+        agent_registry: dict = {}
+        base_policies = {**context.policies, "_agent_registry": agent_registry}
+
         for agent_id in graph.topological_order():
             agent = graph.agents[agent_id]
             agent_context = OperatorContext(
@@ -48,7 +52,7 @@ class GraphExecutor:
                 audit_path=context.audit_path,
                 provider=context.provider,
                 layer_config=context.layer_config,
-                policies=context.policies,
+                policies=base_policies,
                 memory=context.memory,
             )
 
@@ -61,6 +65,18 @@ class GraphExecutor:
             agent_results.append(result)
 
             self._persist_agent_output(rd, agent_id, result)
+
+            # Register completed agent so subsequent agents can ask_agent it
+            if result.success:
+                # Collect the agent's output data from operator results
+                output_data: dict = {}
+                for op_result in result.operator_results:
+                    if op_result.data:
+                        output_data.update(op_result.data)
+                agent_registry[agent_id] = {
+                    "output": output_data,
+                    "provider": context.provider,
+                }
 
             if not result.success:
                 append_audit_event(
